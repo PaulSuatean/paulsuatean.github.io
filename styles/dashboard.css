@@ -1,6 +1,4 @@
 /* Dashboard Styles */
-@import url("./page-common.css");
-
 .dashboard-main {
   padding: 40px 0;
   min-height: calc(100vh - 80px);

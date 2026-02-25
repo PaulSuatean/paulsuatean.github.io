@@ -28,6 +28,241 @@ let memberPhotoValue = '';
 const LOCAL_PREVIEW_PREFIX = 'ancestrio-preview:';
 const LOCAL_PREVIEW_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const LOCAL_GUEST_TREE_KEY = 'ancestrio:guest-tree:v1';
+const FIRESTORE_DOC_SOFT_LIMIT_BYTES = 900 * 1024;
+const EMBEDDED_IMAGE_BUDGET_BYTES = 640 * 1024;
+const MEMBER_IMAGE_MAX_BYTES = 180 * 1024;
+const MEMBER_IMAGE_MAX_DIMENSION = 1200;
+const MEMBER_IMAGE_MIN_DIMENSION = 260;
+const THUMBNAIL_MAX_BYTES = 220 * 1024;
+const IMAGE_FIELD_NAMES = new Set(['image', 'spouseImage', 'thumb', 'spouseThumb', 'thumbnailData']);
+
+function notifyUser(message, type = 'error', options = {}) {
+  if (window.AncestrioRuntime && typeof window.AncestrioRuntime.notify === 'function') {
+    window.AncestrioRuntime.notify(message, type, options);
+    return;
+  }
+  if (type === 'error') {
+    console.error(message);
+  } else {
+    console.warn(message);
+  }
+}
+
+function getUtf8Size(value) {
+  if (value === null || value === undefined) return 0;
+  const text = String(value);
+  if (typeof TextEncoder !== 'undefined') {
+    return new TextEncoder().encode(text).length;
+  }
+  return unescape(encodeURIComponent(text)).length;
+}
+
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function isImageDataUrl(value) {
+  return typeof value === 'string' && /^data:image\/[a-zA-Z0-9.+-]+;base64,/i.test(value);
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = typeof event.target?.result === 'string' ? event.target.result : '';
+      resolve(result);
+    };
+    reader.onerror = () => reject(reader.error || new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      resolve(result);
+    };
+    reader.onerror = () => reject(reader.error || new Error('Failed to convert blob'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+function loadImageElement(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Failed to load image data'));
+    img.src = dataUrl;
+  });
+}
+
+async function compressImageDataUrl(dataUrl, options = {}) {
+  if (!isImageDataUrl(dataUrl)) return dataUrl;
+
+  const maxBytes = Number.isFinite(options.maxBytes) ? options.maxBytes : MEMBER_IMAGE_MAX_BYTES;
+  if (getUtf8Size(dataUrl) <= maxBytes) return dataUrl;
+
+  const image = await loadImageElement(dataUrl);
+  const sourceWidth = image.naturalWidth || image.width || 1;
+  const sourceHeight = image.naturalHeight || image.height || 1;
+  const maxDimension = Number.isFinite(options.maxDimension) ? options.maxDimension : MEMBER_IMAGE_MAX_DIMENSION;
+  const minDimension = Number.isFinite(options.minDimension) ? options.minDimension : MEMBER_IMAGE_MIN_DIMENSION;
+
+  const initialScale = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight));
+  let width = Math.max(1, Math.round(sourceWidth * initialScale));
+  let height = Math.max(1, Math.round(sourceHeight * initialScale));
+
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+
+  const startQuality = Number.isFinite(options.startQuality) ? options.startQuality : 0.88;
+  const minQuality = Number.isFinite(options.minQuality) ? options.minQuality : 0.45;
+  const qualityStep = Number.isFinite(options.qualityStep) ? options.qualityStep : 0.08;
+  const scaleStep = Number.isFinite(options.scaleStep) ? options.scaleStep : 0.84;
+  const fillBackground = options.fillBackground !== false;
+
+  let quality = startQuality;
+  let bestCandidate = '';
+  let bestSize = Number.POSITIVE_INFINITY;
+
+  for (let attempt = 0; attempt < 18; attempt += 1) {
+    canvas.width = width;
+    canvas.height = height;
+    context.clearRect(0, 0, width, height);
+    if (fillBackground) {
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, width, height);
+    }
+    context.drawImage(image, 0, 0, width, height);
+
+    const candidate = canvas.toDataURL('image/jpeg', quality);
+    const candidateSize = getUtf8Size(candidate);
+    if (candidateSize < bestSize) {
+      bestCandidate = candidate;
+      bestSize = candidateSize;
+    }
+
+    if (candidateSize <= maxBytes) {
+      return candidate;
+    }
+
+    if (quality > minQuality + 0.01) {
+      quality = Math.max(minQuality, quality - qualityStep);
+      continue;
+    }
+
+    const nextWidth = Math.round(width * scaleStep);
+    const nextHeight = Math.round(height * scaleStep);
+    if (nextWidth < minDimension || nextHeight < minDimension) {
+      break;
+    }
+
+    width = nextWidth;
+    height = nextHeight;
+    quality = startQuality;
+  }
+
+  if (bestCandidate && bestSize <= Math.round(maxBytes * 1.08)) {
+    return bestCandidate;
+  }
+
+  return null;
+}
+
+async function optimizeTreeImageData(root) {
+  const stats = {
+    scanned: 0,
+    optimized: 0,
+    removed: 0
+  };
+
+  async function walk(node) {
+    if (!node) return;
+
+    if (Array.isArray(node)) {
+      for (let i = 0; i < node.length; i += 1) {
+        await walk(node[i]);
+      }
+      return;
+    }
+
+    if (typeof node !== 'object') return;
+
+    const keys = Object.keys(node);
+    for (let i = 0; i < keys.length; i += 1) {
+      const key = keys[i];
+      const value = node[key];
+
+      if (IMAGE_FIELD_NAMES.has(key) && isImageDataUrl(value)) {
+        stats.scanned += 1;
+        const compressed = await compressImageDataUrl(value, {
+          maxBytes: MEMBER_IMAGE_MAX_BYTES,
+          maxDimension: MEMBER_IMAGE_MAX_DIMENSION,
+          minDimension: MEMBER_IMAGE_MIN_DIMENSION
+        });
+        if (compressed) {
+          node[key] = compressed;
+          if (compressed !== value) {
+            stats.optimized += 1;
+          }
+        } else {
+          node[key] = '';
+          stats.removed += 1;
+        }
+        continue;
+      }
+
+      await walk(value);
+    }
+  }
+
+  await walk(root);
+  return stats;
+}
+
+function measureEmbeddedImageBytes(root) {
+  let total = 0;
+
+  function walk(node) {
+    if (!node) return;
+    if (Array.isArray(node)) {
+      node.forEach(walk);
+      return;
+    }
+    if (typeof node !== 'object') return;
+
+    Object.keys(node).forEach((key) => {
+      const value = node[key];
+      if (IMAGE_FIELD_NAMES.has(key) && isImageDataUrl(value)) {
+        total += getUtf8Size(value);
+      } else {
+        walk(value);
+      }
+    });
+  }
+
+  walk(root);
+  return total;
+}
+
+function estimateFirestorePayloadSize(payload) {
+  try {
+    return getUtf8Size(JSON.stringify(payload));
+  } catch (_) {
+    return Number.POSITIVE_INFINITY;
+  }
+}
+
+function setInvalidField(input, shouldMark) {
+  if (!input) return;
+  input.classList.toggle('input-invalid', !!shouldMark);
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Theme toggle
@@ -49,8 +284,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     treeId = urlParams.get('id');
     if (!treeId) {
-      alert('No tree ID provided');
-      window.location.href = 'dashboard.html';
+      notifyUser('No tree ID provided.', 'warning');
+      setTimeout(() => {
+        window.location.href = 'dashboard.html';
+      }, 300);
       return;
     }
 
@@ -67,6 +304,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Event listeners
   document.getElementById('saveBtn').addEventListener('click', saveTree);
   document.getElementById('viewTreeBtn').addEventListener('click', openPreview);
+  document.getElementById('dashboardBtn')?.addEventListener('click', () => {
+    window.location.href = isLocalGuestMode ? 'dashboard.html?guest=1' : 'dashboard.html';
+  });
   
   // Sidebar actions
   document.getElementById('addPersonBtn').addEventListener('click', addFamilyMember);
@@ -90,7 +330,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   
   // Tree settings - track changes
-  document.getElementById('editTreeName').addEventListener('input', markAsChanged);
+  document.getElementById('editTreeName').addEventListener('input', (event) => {
+    setInvalidField(event.target, false);
+    markAsChanged();
+  });
   document.getElementById('editTreeDescription').addEventListener('input', markAsChanged);
   document.getElementById('editTreePrivacy').addEventListener('change', markAsChanged);
   
@@ -132,8 +375,10 @@ async function loadTree() {
     const doc = await db.collection('trees').doc(treeId).get();
     
     if (!doc.exists) {
-      alert('Tree not found');
-      window.location.href = 'dashboard.html';
+      notifyUser('Tree not found.', 'warning');
+      setTimeout(() => {
+        window.location.href = 'dashboard.html';
+      }, 300);
       return;
     }
     
@@ -141,8 +386,10 @@ async function loadTree() {
     
     // Check ownership
     if (currentTree.userId !== currentUser.uid) {
-      alert('You do not have permission to edit this tree');
-      window.location.href = 'dashboard.html';
+      notifyUser('You do not have permission to edit this tree.', 'error');
+      setTimeout(() => {
+        window.location.href = 'dashboard.html';
+      }, 300);
       return;
     }
     
@@ -168,7 +415,7 @@ async function loadTree() {
     updateSaveButton();
   } catch (error) {
     console.error('Error loading tree:', error);
-    alert('Failed to load tree. Please try again.');
+    notifyUser('Failed to load tree. Please try again.', 'error');
   }
 }
 
@@ -179,11 +426,6 @@ function configureGuestModeUI() {
     .find((item) => /saved to the cloud/i.test(item.textContent || ''));
   if (cloudInstruction) {
     cloudInstruction.textContent = 'Changes are saved locally in this browser';
-  }
-
-  const backLink = document.querySelector('.controls-editor a[href="dashboard.html"]');
-  if (backLink) {
-    backLink.href = 'dashboard.html?guest=1';
   }
 
   const container = document.querySelector('.editor-container');
@@ -315,6 +557,59 @@ function updateSaveButton() {
   }
 }
 
+function isLocalStyleSheet(styleSheet) {
+  if (!styleSheet || !styleSheet.href) return true;
+  try {
+    return new URL(styleSheet.href, window.location.href).origin === window.location.origin;
+  } catch (_) {
+    return false;
+  }
+}
+
+function collectExportCssRules(styleSheet, visitedSheets) {
+  if (!styleSheet || visitedSheets.has(styleSheet)) return '';
+  if (!isLocalStyleSheet(styleSheet)) return '';
+  visitedSheets.add(styleSheet);
+
+  let rules;
+  try {
+    rules = styleSheet.cssRules;
+  } catch (error) {
+    if (error?.name !== 'SecurityError') {
+      console.warn('Failed to collect stylesheet rules for thumbnail export:', error);
+    }
+    return '';
+  }
+
+  if (!rules) return '';
+
+  let cssText = '';
+  Array.from(rules).forEach((rule) => {
+    if (typeof CSSRule !== 'undefined' && rule.type === CSSRule.IMPORT_RULE && rule.styleSheet) {
+      cssText += collectExportCssRules(rule.styleSheet, visitedSheets);
+      return;
+    }
+    cssText += `${rule.cssText}\n`;
+  });
+
+  return cssText;
+}
+
+function applyExportThemeVariables(svgNode) {
+  if (!svgNode) return;
+
+  const rootStyles = window.getComputedStyle(document.documentElement);
+  const bodyStyles = window.getComputedStyle(document.body);
+  const variableNames = ['--surface', '--surface-2', '--border', '--text', '--accent', '--accent-2', '--line'];
+
+  variableNames.forEach((variableName) => {
+    const value = (bodyStyles.getPropertyValue(variableName) || rootStyles.getPropertyValue(variableName) || '').trim();
+    if (value) {
+      svgNode.style.setProperty(variableName, value);
+    }
+  });
+}
+
 async function generateTreeThumbnail() {
   try {
     if (!visualState.svg || !visualState.g) {
@@ -358,6 +653,7 @@ async function generateTreeThumbnail() {
     clonedSvg.setAttribute('width', thumbnailWidth.toString());
     clonedSvg.setAttribute('height', thumbnailHeight.toString());
     clonedSvg.setAttribute('viewBox', `0 0 ${thumbnailWidth} ${thumbnailHeight}`);
+    applyExportThemeVariables(clonedSvg);
     
     // Find the g element in the clone and apply centering transform
     const clonedG = clonedSvg.querySelector('g');
@@ -365,32 +661,27 @@ async function generateTreeThumbnail() {
       clonedG.setAttribute('transform', `translate(${offsetX}, ${offsetY}) scale(${scale})`);
     }
     
-    // Get computed styles and inline them
+    // Get computed styles and inline them (including @import trees)
     const styleSheets = Array.from(document.styleSheets);
-    let cssText = '';
-    styleSheets.forEach(sheet => {
-      try {
-        if (sheet.cssRules) {
-          Array.from(sheet.cssRules).forEach(rule => {
-            cssText += rule.cssText + '\n';
-          });
-        }
-      } catch (e) {
-        // Cross-origin stylesheets may throw errors
-        console.log('Could not access stylesheet:', e);
-      }
-    });
+    const visitedSheets = new Set();
+    const cssText = styleSheets.map((sheet) => collectExportCssRules(sheet, visitedSheets)).join('\n');
+    const fallbackTreeCss = [
+      '#visualTree .person rect { fill: var(--surface, #0b1d33); stroke: var(--border, rgba(230, 238, 249, 0.18)); stroke-width: 2px; }',
+      '#visualTree .person .name { fill: var(--text, #e6eef9); font-size: 14px; font-weight: 700; }',
+      '#visualTree .link { fill: none; stroke: var(--line, #cbd5e1); stroke-width: 2.25px; }',
+      '#visualTree .avatar-group > circle { fill: var(--surface-2, #132a46); stroke: var(--border, rgba(230, 238, 249, 0.18)); stroke-width: 2px; }'
+    ].join('\n');
     
     // Add a style element to the cloned SVG
     const styleElement = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-    styleElement.textContent = cssText;
+    styleElement.textContent = `${fallbackTreeCss}\n${cssText}`;
     clonedSvg.insertBefore(styleElement, clonedSvg.firstChild);
     
     // Serialize the SVG
     const svgString = new XMLSerializer().serializeToString(clonedSvg);
     const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
     
-    // Convert to PNG using canvas
+    // Convert to image using canvas
     return new Promise((resolve) => {
       const url = URL.createObjectURL(svgBlob);
       const img = new Image();
@@ -412,7 +703,7 @@ async function generateTreeThumbnail() {
         canvas.toBlob((blob) => {
           URL.revokeObjectURL(url);
           resolve(blob);
-        }, 'image/png', 0.9);
+        }, 'image/jpeg', 0.84);
       };
       
       img.onerror = () => {
@@ -433,7 +724,8 @@ async function saveTree() {
   if (isLocalGuestMode) {
     const saved = persistGuestTree();
     if (!saved) {
-      alert('Invalid JSON format. Please fix errors before continuing.');
+      showJsonStatus('Invalid JSON format. Please fix errors before continuing.', 'invalid');
+      notifyUser('Invalid JSON format. Please fix errors before continuing.', 'warning');
       return false;
     }
     return true;
@@ -466,20 +758,38 @@ async function saveTree() {
       try {
         treeData = JSON.parse(jsonText);
       } catch (e) {
-        alert('Invalid JSON format. Please fix errors before saving.');
+        showJsonStatus('Invalid JSON format. Please fix errors before saving.', 'invalid');
+        notifyUser('Invalid JSON format. Please fix errors before saving.', 'warning');
         return false;
       }
 
       // Clean up any duplicate nodes before saving
       treeData = cleanupTreeData(treeData);
+      const imageOptimization = await optimizeTreeImageData(treeData);
+      if (imageOptimization.optimized > 0) {
+        notifyUser(`Optimized ${imageOptimization.optimized} embedded photo(s) for faster saves.`, 'info', {
+          duration: 3200
+        });
+      }
+      if (imageOptimization.removed > 0) {
+        notifyUser(
+          `${imageOptimization.removed} photo(s) were removed because they exceeded safe Firestore size limits.`,
+          'warning',
+          { duration: 5200 }
+        );
+      }
 
       // Get updated values
+      const treeNameInput = document.getElementById('editTreeName');
       const name = document.getElementById('editTreeName').value.trim();
       const description = document.getElementById('editTreeDescription').value.trim();
       const privacy = document.getElementById('editTreePrivacy').value;
+      setInvalidField(treeNameInput, false);
 
       if (!name) {
-        alert('Tree name is required');
+        setInvalidField(treeNameInput, true);
+        treeNameInput?.focus();
+        notifyUser('Tree name is required.', 'warning');
         return false;
       }
 
@@ -508,13 +818,23 @@ async function saveTree() {
           // Now generate the thumbnail from the centered, rendered view
           const thumbnailBlob = await generateTreeThumbnail();
           if (thumbnailBlob) {
-            // Convert blob to base64
-            thumbnailData = await new Promise((resolve) => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result);
-              reader.readAsDataURL(thumbnailBlob);
+            const rawThumbnail = await blobToDataUrl(thumbnailBlob);
+            thumbnailData = await compressImageDataUrl(rawThumbnail, {
+              maxBytes: THUMBNAIL_MAX_BYTES,
+              maxDimension: 800,
+              minDimension: 320,
+              startQuality: 0.84,
+              minQuality: 0.5,
+              qualityStep: 0.06,
+              fillBackground: true
             });
-            console.log('Thumbnail generated successfully');
+            if (thumbnailData) {
+              console.log('Thumbnail generated successfully');
+            } else {
+              notifyUser('Thumbnail exceeded size limits and was skipped for this save.', 'warning', {
+                duration: 4600
+              });
+            }
           } else {
             console.log('No thumbnail blob generated - tree may be empty');
           }
@@ -533,9 +853,36 @@ async function saveTree() {
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       };
 
+      const embeddedImageBytes = measureEmbeddedImageBytes(treeData) + (thumbnailData ? getUtf8Size(thumbnailData) : 0);
+      if (embeddedImageBytes > EMBEDDED_IMAGE_BUDGET_BYTES) {
+        notifyUser(
+          `Embedded image data is too large (${formatBytes(embeddedImageBytes)}). Remove or shrink photos and try again.`,
+          'error',
+          { duration: 7000 }
+        );
+        return false;
+      }
+
       // Only update thumbnailData if we have a new one
       if (thumbnailData) {
         updateData.thumbnailData = thumbnailData;
+      }
+
+      const estimatedPayloadSize = estimateFirestorePayloadSize({
+        name,
+        description,
+        privacy,
+        data: treeData,
+        updatedAt: 'SERVER_TIMESTAMP',
+        thumbnailData: thumbnailData || ''
+      });
+      if (estimatedPayloadSize > FIRESTORE_DOC_SOFT_LIMIT_BYTES) {
+        notifyUser(
+          `Tree payload is too large (${formatBytes(estimatedPayloadSize)} estimated). Reduce embedded photos and retry.`,
+          'error',
+          { duration: 7000 }
+        );
+        return false;
       }
 
       await db.collection('trees').doc(treeId).update(updateData);
@@ -578,7 +925,7 @@ async function saveTree() {
         code: error.code,
         stack: error.stack
       });
-      alert('Failed to save tree: ' + (error.message || 'Please try again.'));
+      notifyUser('Failed to save tree: ' + (error.message || 'Please try again.'), 'error', { duration: 6500 });
       return false;
     } finally {
       updateSaveButton();
@@ -610,7 +957,7 @@ async function openPreview() {
       previewKey = storeLocalPreviewDraft(draft);
     } catch (error) {
       console.error('Failed to store local preview draft:', error);
-      alert('Could not open preview locally. Please try again.');
+      notifyUser('Could not open preview locally. Please try again.', 'error');
       return;
     }
 
@@ -631,7 +978,8 @@ function buildLocalPreviewDraft() {
   try {
     treeData = JSON.parse(jsonEditor.value || '{}');
   } catch (e) {
-    alert('Invalid JSON format. Please fix errors before preview.');
+    showJsonStatus('Invalid JSON format. Please fix errors before preview.', 'invalid');
+    notifyUser('Invalid JSON format. Please fix errors before preview.', 'warning');
     return null;
   }
 
@@ -778,7 +1126,7 @@ function importJson() {
   const jsonText = document.getElementById('pasteJson').value.trim();
   
   if (!jsonText) {
-    alert('Please select a file or paste JSON data');
+    notifyUser('Please select a file or paste JSON data.', 'warning');
     return;
   }
   
@@ -790,16 +1138,27 @@ function importJson() {
     switchTab('json');
     scheduleVisualRender(true);
   } catch (e) {
-    alert('Invalid JSON format: ' + e.message);
+    notifyUser('Invalid JSON format: ' + e.message, 'warning');
   }
 }
 
-function addFamilyMember() {
-  // From sidebar - show popup at button position
-  const btn = document.getElementById('addPersonBtn');
-  const rect = btn.getBoundingClientRect();
+function addFamilyMember(event) {
   pendingAddMemberMeta = { type: 'root' };
-  showAddMemberPopup({ clientX: rect.right + 10, clientY: rect.top }, pendingAddMemberMeta);
+
+  if (event && event.currentTarget) {
+    event.stopPropagation();
+    showAddMemberPopup(event, pendingAddMemberMeta);
+    return;
+  }
+
+  const btn = document.getElementById('addPersonBtn');
+  if (!btn) return;
+  const rect = btn.getBoundingClientRect();
+  showAddMemberPopup({
+    clientX: rect.right + 8,
+    clientY: rect.top + (rect.height / 2),
+    currentTarget: btn
+  }, pendingAddMemberMeta);
 }
 
 function initVisualEditor() {
@@ -870,23 +1229,19 @@ function restructureForOrigin(data) {
   const result = findNodeAndParent(data, originNode);
   if (!result || !result.parent) return data; // Origin is root, return as-is
 
-  // Extract the origin and restructure
-  const newRoot = {
-    name: originNode.name,
-    image: originNode.image,
-    birthday: originNode.birthday,
-    spouse: originNode.spouse,
-    spouseImage: originNode.spouseImage,
-    spouseBirthday: originNode.spouseBirthday,
-    tags: originNode.tags,
-    spouseTags: originNode.spouseTags,
-    children: originNode.children || []
-  };
+  // Clone the selected origin node as-is so visual schema fields stay intact.
+  const newRoot = JSON.parse(JSON.stringify(originNode));
+  if (!Array.isArray(newRoot.children)) {
+    newRoot.children = [];
+  }
 
-  // Deep clone the parent and remove the origin node from its children
+  // Deep clone the parent and remove the origin node from its children by index.
   const parentCopy = JSON.parse(JSON.stringify(result.parent));
-  if (Array.isArray(parentCopy.children)) {
-    parentCopy.children = parentCopy.children.filter(child => child !== originNode);
+  const originIndex = Array.isArray(result.parent.children)
+    ? result.parent.children.indexOf(originNode)
+    : -1;
+  if (Array.isArray(parentCopy.children) && originIndex >= 0) {
+    parentCopy.children.splice(originIndex, 1);
   }
 
   // Store the parent hierarchy as "parents" property
@@ -937,14 +1292,15 @@ function renderVisualEditor(resetTransform) {
     return;
   }
 
-  // Restructure data so origin node is at root with parents as overlay
-  treeData = restructureForOrigin(treeData);
+  // Keep full hierarchy in editor so parents/siblings remain visible and editable.
+  // Origin re-rooting is handled in the viewer renderer.
 
   // Match demo-tree dimensions
   const person = { width: 170, height: 120, spouseGap: 48 };
   const avatar = { r: 36, top: 10 };
   const spacing = { y: 180 };
   const nodeSize = { width: person.width, height: person.height };
+  const generationStepY = nodeSize.height + spacing.y;
   const baseCoupleWidth = person.width * 2 + person.spouseGap;
   const minHorizontalGap = Math.max(16, person.width * 0.35);
   const getRenderableSpouseEntries = (nodeData) => {
@@ -970,7 +1326,7 @@ function renderVisualEditor(resetTransform) {
     return person.width * count + person.spouseGap * (count - 1);
   };
   const layout = d3.tree()
-    .nodeSize([baseCoupleWidth, nodeSize.height + spacing.y])
+    .nodeSize([baseCoupleWidth, generationStepY])
     .separation((a, b) => {
       const needed = (nodeGroupWidth(a) / 2) + minHorizontalGap + (nodeGroupWidth(b) / 2);
       const base = needed / baseCoupleWidth;
@@ -982,6 +1338,9 @@ function renderVisualEditor(resetTransform) {
   const nodes = root.descendants();
 
   const spouseNodes = [];
+  const spouseAncestorGroups = [];
+  const spouseAncestorPrimaryNodes = [];
+  const spouseAncestorSpouseNodes = [];
   const spouseByPrimaryId = new Map();
   const spouseEntriesByPrimaryId = new Map();
   nodes.forEach((node) => {
@@ -1019,6 +1378,29 @@ function renderVisualEditor(resetTransform) {
       descendant.x += deltaX;
     });
   };
+  const getChildGroupCenterX = (childNodes) => {
+    if (!Array.isArray(childNodes) || childNodes.length === 0) return null;
+    let minCenter = Number.POSITIVE_INFINITY;
+    let maxCenter = Number.NEGATIVE_INFINITY;
+    childNodes.forEach((childNode) => {
+      const childCenter = getPrimaryCenterForNode(childNode, getRenderableSpouseCount(childNode));
+      if (!Number.isFinite(childCenter)) return;
+      minCenter = Math.min(minCenter, childCenter);
+      maxCenter = Math.max(maxCenter, childCenter);
+    });
+    if (!Number.isFinite(minCenter) || !Number.isFinite(maxCenter)) return null;
+    return (minCenter + maxCenter) / 2;
+  };
+  const alignChildGroupToTargetX = (childNodes, targetX) => {
+    if (!Array.isArray(childNodes) || childNodes.length === 0) return;
+    if (!Number.isFinite(targetX)) return;
+    const currentCenter = getChildGroupCenterX(childNodes);
+    if (!Number.isFinite(currentCenter)) return;
+    const deltaX = targetX - currentCenter;
+    childNodes.forEach((childNode) => {
+      shiftSubtreeX(childNode, deltaX);
+    });
+  };
   const getChildSpouseSourceIndexForAlign = (childNode) => {
     const rawIndex = Number(childNode && childNode.data ? childNode.data.fromSpouseIndex : undefined);
     const fallback = (childNode && childNode.data && childNode.data.fromPrevSpouse) ? 1 : 0;
@@ -1040,9 +1422,9 @@ function renderVisualEditor(resetTransform) {
     return (primaryInteriorX + spouseInteriorX) / 2;
   };
   const alignChildColumnsLikeDemo = () => {
-    // Keep single-child branches centered like demo-tree:
+    // Keep child branches centered like demo-tree:
     // no-spouse parent => child under parent primary;
-    // spouse branch => child under that couple's merge center.
+    // spouse branch => children under that couple's merge center.
     root.descendants().forEach((parentNode) => {
       const childList = Array.isArray(parentNode.children) ? parentNode.children : [];
       if (childList.length === 0) return;
@@ -1051,11 +1433,8 @@ function renderVisualEditor(resetTransform) {
       const parentSpouseCount = parentSpouseEntries.length;
 
       if (parentSpouseCount === 0) {
-        if (childList.length !== 1) return;
-        const childNode = childList[0];
         const targetX = getPrimaryCenterForNode(parentNode, 0);
-        const childPrimaryCenter = getPrimaryCenterForNode(childNode, getRenderableSpouseCount(childNode));
-        shiftSubtreeX(childNode, targetX - childPrimaryCenter);
+        alignChildGroupToTargetX(childList, targetX);
         return;
       }
 
@@ -1070,11 +1449,8 @@ function renderVisualEditor(resetTransform) {
       });
 
       childrenBySpouseRenderIndex.forEach((spouseChildren, renderIndex) => {
-        if (spouseChildren.length !== 1) return;
-        const childNode = spouseChildren[0];
         const targetX = getMergeCenterForSpouseBranch(parentNode, parentSpouseCount, renderIndex);
-        const childPrimaryCenter = getPrimaryCenterForNode(childNode, getRenderableSpouseCount(childNode));
-        shiftSubtreeX(childNode, targetX - childPrimaryCenter);
+        alignChildGroupToTargetX(spouseChildren, targetX);
       });
     });
   };
@@ -1096,7 +1472,10 @@ function renderVisualEditor(resetTransform) {
         childIndex: node.data.meta.childIndex,
         grandIndex: node.data.meta.grandIndex,
         targetType: node.data.meta.targetType,
-        spouseIndex: sourceIndex
+        spouseIndex: sourceIndex,
+        ancestorDepth: Number.isFinite(Number(node.data.meta.ancestorDepth))
+          ? Math.max(0, Math.trunc(Number(node.data.meta.ancestorDepth)))
+          : 0
       };
 
       if (parentType === 'couple') {
@@ -1122,10 +1501,308 @@ function renderVisualEditor(resetTransform) {
         spouseByPrimaryId.set(node.data.id, []);
       }
       spouseByPrimaryId.get(node.data.id).push(spouseNode);
+
+      const spouseParents = (spouse && typeof spouse === 'object' && spouse.parents && typeof spouse.parents === 'object')
+        ? spouse.parents
+        : null;
+      if (!spouseParents) return;
+      const spouseTargetMeta = {
+        parentType: spouseMeta.parentType,
+        targetType: spouseMeta.targetType,
+        parentIndex: spouseMeta.parentIndex,
+        childIndex: spouseMeta.childIndex,
+        grandIndex: spouseMeta.grandIndex,
+        spouseIndex: spouseMeta.spouseIndex,
+        ancestorDepth: spouseMeta.ancestorDepth
+      };
+      const buildSpouseAncestorChain = (childAnchorNode, currentParentsData, depth) => {
+        if (!currentParentsData || typeof currentParentsData !== 'object' || !childAnchorNode) return;
+
+        const rawAncestorSpouses = extractSpouses(currentParentsData.spouse);
+        const ancestorSpouseEntries = getRenderableSpouseEntries({
+          spouses: rawAncestorSpouses.length > 0 ? [rawAncestorSpouses[0]] : []
+        });
+        const legacyOverflowParents = rawAncestorSpouses
+          .slice(1)
+          .map((entry) => {
+            if (!entry) return null;
+            if (typeof entry === 'string') {
+              const name = safeText(entry);
+              return name ? { name, image: '', birthday: '' } : null;
+            }
+            const name = safeText(entry.name);
+            if (!name) return null;
+            return {
+              name,
+              image: safeText(entry.image),
+              birthday: safeText(entry.birthday)
+            };
+          })
+          .filter(Boolean);
+
+        let higherParents = (currentParentsData.parents && typeof currentParentsData.parents === 'object')
+          ? currentParentsData.parents
+          : null;
+        if (!higherParents && legacyOverflowParents.length > 0) {
+          for (let i = legacyOverflowParents.length - 1; i >= 0; i -= 1) {
+            higherParents = {
+              ...legacyOverflowParents[i],
+              parents: higherParents
+            };
+          }
+        }
+
+        const ancestorPrimaryName = safeText(currentParentsData.name);
+        if (!ancestorPrimaryName && ancestorSpouseEntries.length === 0 && !higherParents) return;
+
+        const outwardOffsetX = nodeSize.width / 2 + person.spouseGap / 2;
+        const ancestorPrimaryCenterX = ancestorSpouseEntries.length > 0
+          ? childAnchorNode.x - outwardOffsetX
+          : childAnchorNode.x;
+        const ancestorPrimaryMeta = parentType === 'couple'
+          ? {
+            type: 'ancestor',
+            ancestorDepth: depth,
+            addable: false,
+            editable: false
+          }
+          : {
+            type: 'ancestor',
+            targetType: 'spouse',
+            ancestorDepth: depth,
+            spouseMeta: spouseTargetMeta
+          };
+        const ancestorPrimaryNode = {
+          x: ancestorPrimaryCenterX,
+          y: childAnchorNode.y - generationStepY,
+          data: {
+            id: `${node.data.id}-spouse-${sourceIndex}-parents-${depth}`,
+            label: formatCoupleLabel(currentParentsData.name, null) || 'Parent',
+            image: currentParentsData.image || '',
+            meta: ancestorPrimaryMeta
+          }
+        };
+        spouseAncestorPrimaryNodes.push(ancestorPrimaryNode);
+
+        const ancestorSpouseNodes = [];
+        ancestorSpouseEntries.forEach(({ spouse: ancestorSpouse, sourceIndex: ancestorSourceIndex, renderIndex: ancestorRenderIndex, label: ancestorLabel }) => {
+          const ancestorSpouseMeta = parentType === 'couple'
+            ? {
+              type: 'spouse',
+              ancestorDepth: depth,
+              addable: false,
+              editable: false
+            }
+            : {
+              type: 'spouse',
+              parentType: 'ancestor',
+              targetType: 'spouse',
+              ancestorDepth: depth,
+              spouseIndex: ancestorSourceIndex,
+              spouseMeta: spouseTargetMeta
+            };
+          const ancestorSpouseNode = {
+            x: getSpouseCenterFromPrimary(ancestorPrimaryCenterX, ancestorRenderIndex),
+            y: ancestorPrimaryNode.y,
+            sourceSpouseIndex: ancestorSourceIndex,
+            renderSpouseIndex: ancestorRenderIndex,
+            data: {
+              id: `${ancestorPrimaryNode.data.id}-spouse-${ancestorSourceIndex}`,
+              label: ancestorLabel,
+              image: (ancestorSpouse && typeof ancestorSpouse === 'object' ? ancestorSpouse.image : '') || '',
+              meta: ancestorSpouseMeta
+            }
+          };
+          spouseAncestorSpouseNodes.push(ancestorSpouseNode);
+          ancestorSpouseNodes.push(ancestorSpouseNode);
+        });
+
+        spouseAncestorGroups.push({
+          childSpouseNode: childAnchorNode,
+          primary: ancestorPrimaryNode,
+          spouses: ancestorSpouseNodes
+        });
+
+        if (higherParents) {
+          buildSpouseAncestorChain(ancestorPrimaryNode, higherParents, depth + 1);
+        }
+      };
+
+      buildSpouseAncestorChain(spouseNode, spouseParents, 0);
     });
   });
 
-  const renderNodes = nodes.concat(spouseNodes);
+  const alignAncestorRowsByGeneration = () => {
+    const originNode = nodes.find((node) => !!(node && node.data && node.data.isOrigin));
+    if (!originNode || !Number.isFinite(originNode.y)) return;
+
+    const rowTolerance = 0.5;
+    const isSameRow = (a, b) => Math.abs((Number(a) || 0) - (Number(b) || 0)) <= rowTolerance;
+
+    const getPrimaryCenterX = (node) => {
+      const spouseEntries = spouseEntriesByPrimaryId.get(node.data.id) || [];
+      return getPrimaryCenterForNode(node, spouseEntries.length);
+    };
+
+    const pushRowCard = (cards, x, applyDeltaFn) => {
+      if (!Number.isFinite(x) || typeof applyDeltaFn !== 'function') return;
+      const card = {
+        x,
+        applyDelta: (dx) => {
+          if (!Number.isFinite(dx) || Math.abs(dx) < 0.001) return;
+          applyDeltaFn(dx);
+          card.x += dx;
+        }
+      };
+      cards.push(card);
+    };
+
+    const collectRowCards = (rowY) => {
+      const cards = [];
+      nodes
+        .filter((node) => isSameRow(node.y, rowY))
+        .forEach((node) => {
+          const currentX = getPrimaryCenterX(node);
+          pushRowCard(cards, currentX, (dx) => { node.x += dx; });
+        });
+      spouseNodes
+        .filter((node) => isSameRow(node.y, rowY))
+        .forEach((node) => {
+          pushRowCard(cards, node.x, (dx) => { node.x += dx; });
+        });
+      spouseAncestorPrimaryNodes
+        .filter((node) => isSameRow(node.y, rowY))
+        .forEach((node) => {
+          pushRowCard(cards, node.x, (dx) => { node.x += dx; });
+        });
+      spouseAncestorSpouseNodes
+        .filter((node) => isSameRow(node.y, rowY))
+        .forEach((node) => {
+          pushRowCard(cards, node.x, (dx) => { node.x += dx; });
+        });
+      cards.sort((a, b) => a.x - b.x);
+      return cards;
+    };
+
+    const collectRowCenters = (rowY) => {
+      return nodes
+        .filter((node) => isSameRow(node.y, rowY))
+        .map((node) => getPrimaryCenterX(node))
+        .concat(
+          spouseNodes
+            .filter((node) => isSameRow(node.y, rowY))
+            .map((node) => node.x)
+        )
+        .concat(
+          spouseAncestorPrimaryNodes
+            .filter((node) => isSameRow(node.y, rowY))
+            .map((node) => node.x)
+        )
+        .concat(
+          spouseAncestorSpouseNodes
+            .filter((node) => isSameRow(node.y, rowY))
+            .map((node) => node.x)
+        )
+        .filter((x) => Number.isFinite(x))
+        .sort((a, b) => a - b);
+    };
+
+    const collectAllRowYs = () => {
+      const values = nodes
+        .map((node) => Number(node.y))
+        .concat(spouseNodes.map((node) => Number(node.y)))
+        .concat(spouseAncestorPrimaryNodes.map((node) => Number(node.y)))
+        .concat(spouseAncestorSpouseNodes.map((node) => Number(node.y)))
+        .filter((y) => Number.isFinite(y));
+      const unique = [];
+      values.sort((a, b) => a - b);
+      values.forEach((y) => {
+        if (!unique.length || !isSameRow(unique[unique.length - 1], y)) {
+          unique.push(y);
+        }
+      });
+      return unique;
+    };
+
+    const rowHasAncestor = (rowY) => {
+      const hasPrimaryAncestor = nodes.some((node) => {
+        return isSameRow(node.y, rowY)
+          && node
+          && node.data
+          && node.data.meta
+          && node.data.meta.type === 'ancestor';
+      });
+      if (hasPrimaryAncestor) return true;
+      return spouseAncestorPrimaryNodes.some((node) => isSameRow(node.y, rowY))
+        || spouseAncestorSpouseNodes.some((node) => isSameRow(node.y, rowY));
+    };
+
+    const allRowYs = collectAllRowYs();
+    if (!allRowYs.length) return;
+
+    const ancestorRowYs = allRowYs
+      .filter((rowY) => rowY < originNode.y - rowTolerance)
+      .filter((rowY) => rowHasAncestor(rowY))
+      .sort((a, b) => b - a); // bottom-up so each row aligns to already-stabilized lower rows
+
+    const minCenterGap = nodeSize.width + person.spouseGap;
+    const computeAnchorStep = (centers) => {
+      if (!Array.isArray(centers) || centers.length < 2) return minCenterGap;
+      const diffs = [];
+      for (let i = 1; i < centers.length; i += 1) {
+        const diff = centers[i] - centers[i - 1];
+        if (Number.isFinite(diff) && diff > 1) diffs.push(diff);
+      }
+      if (!diffs.length) return minCenterGap;
+      diffs.sort((a, b) => a - b);
+      const mid = Math.floor(diffs.length / 2);
+      const median = diffs.length % 2 === 0
+        ? (diffs[mid - 1] + diffs[mid]) / 2
+        : diffs[mid];
+      return Math.max(minCenterGap, median);
+    };
+    const buildCenteredTargets = (count, centerX, step) => {
+      const targets = [];
+      const safeCount = Math.max(0, Math.trunc(Number(count)));
+      if (!safeCount || !Number.isFinite(centerX) || !Number.isFinite(step) || step <= 0) return targets;
+      for (let i = 0; i < safeCount; i += 1) {
+        targets.push(centerX + (i - ((safeCount - 1) / 2)) * step);
+      }
+      return targets;
+    };
+
+    ancestorRowYs.forEach((rowY) => {
+      const lowerRowY = allRowYs.find((candidateY) => candidateY > rowY + rowTolerance);
+      if (!Number.isFinite(lowerRowY)) return;
+
+      const rowCards = collectRowCards(rowY);
+      if (!rowCards.length) return;
+
+      const anchorCenters = collectRowCenters(lowerRowY);
+      if (!anchorCenters.length) return;
+
+      let targetCenters = [];
+      if (rowCards.length === anchorCenters.length) {
+        targetCenters = anchorCenters.slice();
+      } else {
+        const anchorCenterX = (anchorCenters[0] + anchorCenters[anchorCenters.length - 1]) / 2;
+        const step = computeAnchorStep(anchorCenters);
+        targetCenters = buildCenteredTargets(rowCards.length, anchorCenterX, step);
+      }
+
+      if (!targetCenters.length) return;
+      const pairCount = Math.min(rowCards.length, targetCenters.length);
+      for (let i = 0; i < pairCount; i += 1) {
+        const deltaX = targetCenters[i] - rowCards[i].x;
+        if (!Number.isFinite(deltaX) || Math.abs(deltaX) < 0.75) continue;
+        rowCards[i].applyDelta(deltaX);
+      }
+    });
+  };
+  alignAncestorRowsByGeneration();
+
+  const renderNodes = nodes.concat(spouseNodes, spouseAncestorPrimaryNodes, spouseAncestorSpouseNodes);
+  const hasOriginNode = renderNodes.some((node) => !!(node && node.data && node.data.isOrigin));
 
   // Ensure defs for clip paths
   let defs = visualState.svg.select('defs');
@@ -1252,6 +1929,70 @@ function renderVisualEditor(resetTransform) {
         target: topOfPrimary(child)
       });
     });
+  });
+
+  spouseAncestorGroups.forEach((group) => {
+    if (!group || !group.primary || !group.childSpouseNode) return;
+
+    const childTarget = {
+      x: group.childSpouseNode.x,
+      y: group.childSpouseNode.y - nodeSize.height / 2
+    };
+    const yCenter = group.primary.y;
+    const ancestorSpouses = Array.isArray(group.spouses) ? group.spouses : [];
+
+    if (!ancestorSpouses.length) {
+      branches.push({
+        source: {
+          x: group.primary.x,
+          y: yCenter + nodeSize.height / 2 + splitPad
+        },
+        target: childTarget
+      });
+      return;
+    }
+
+    let connectedToChild = false;
+    ancestorSpouses.forEach((ancestorSpouseNode) => {
+      const isRightSide = ancestorSpouseNode.x >= group.primary.x;
+      const primaryInterior = {
+        x: group.primary.x + (isRightSide ? nodeSize.width / 2 : -nodeSize.width / 2),
+        y: yCenter
+      };
+      const spouseInterior = {
+        x: ancestorSpouseNode.x + (isRightSide ? -nodeSize.width / 2 : nodeSize.width / 2),
+        y: yCenter
+      };
+
+      const shouldConnect = !connectedToChild && ancestorSpouseNode.renderSpouseIndex === 0;
+      if (!shouldConnect) {
+        marriageLines.push({
+          x0: Math.min(primaryInterior.x, spouseInterior.x),
+          x1: Math.max(primaryInterior.x, spouseInterior.x),
+          y: yCenter
+        });
+        return;
+      }
+
+      connectedToChild = true;
+      const mergeTarget = {
+        x: (primaryInterior.x + spouseInterior.x) / 2,
+        y: yCenter + mergePad
+      };
+      mergeCurves.push({ source: primaryInterior, target: mergeTarget });
+      mergeCurves.push({ source: spouseInterior, target: mergeTarget });
+      branches.push({ source: mergeTarget, target: childTarget });
+    });
+
+    if (!connectedToChild) {
+      branches.push({
+        source: {
+          x: group.primary.x,
+          y: yCenter + nodeSize.height / 2 + splitPad
+        },
+        target: childTarget
+      });
+    }
   });
 
   function unionCurvePath(d) {
@@ -1381,6 +2122,7 @@ function renderVisualEditor(resetTransform) {
     })
     .on('click', (event, d) => {
       if (event.defaultPrevented) return;
+      if (d && d.data && d.data.meta && d.data.meta.editable === false) return;
       event.stopPropagation();
       showEditMemberModal(d.data.meta);
     });
@@ -1402,9 +2144,15 @@ function renderVisualEditor(resetTransform) {
   mergedNodes.select('.node-add')
     .style('display', (d) => (d.data.meta && d.data.meta.addable === false ? 'none' : 'block'));
 
-  // Show/hide delete button - everyone except root gets a - button
+  // Show/hide delete button - only the selected origin person is protected.
   mergedNodes.select('.node-delete')
-    .style('display', (d) => (d.data.meta && d.data.meta.type === 'root' ? 'none' : 'block'));
+    .style('display', (d) => {
+      if (d && d.data && d.data.meta && d.data.meta.editable === false) return 'none';
+      if (d && d.data && d.data.isOrigin) return 'none';
+      // Backward compatibility for trees that don't have an origin marker yet.
+      if (!hasOriginNode && d.data && d.data.meta && d.data.meta.type === 'root') return 'none';
+      return 'block';
+    });
 
   if (resetTransform || !visualState.hasUserTransform) {
     centerVisualTree(renderNodes, nodeSize);
@@ -1518,13 +2266,43 @@ function buildVisualTreeData(data) {
   return sortTreeBySpouseGroup(tree);
 }
 
+function hasExplicitOriginInRFamilyNode(node) {
+  if (!node || typeof node !== 'object') return false;
+  if (node.isOrigin) return true;
+
+  const childCollections = [];
+  if (Array.isArray(node.Parent)) childCollections.push(node.Parent);
+  if (Array.isArray(node.children)) childCollections.push(node.children);
+  if (Array.isArray(node.grandchildren)) childCollections.push(node.grandchildren);
+
+  for (const collection of childCollections) {
+    for (const child of collection) {
+      if (hasExplicitOriginInRFamilyNode(child)) return true;
+    }
+  }
+
+  return false;
+}
+
 function buildRFamilyTree(src) {
+  const centerName = safeText(src && src.setupContext && src.setupContext.centerName).toLowerCase();
+  const shouldInferOrigin = !hasExplicitOriginInRFamilyNode(src) && !!centerName;
+  let inferredOriginAssigned = false;
+  const inferOriginByName = (candidateName) => {
+    if (!shouldInferOrigin || inferredOriginAssigned) return false;
+    const normalizedName = safeText(candidateName).toLowerCase();
+    if (!normalizedName || normalizedName !== centerName) return false;
+    inferredOriginAssigned = true;
+    return true;
+  };
+
   const rootLabel = formatCoupleLabel(src.Grandparent, null);
   const rootSpouses = extractSpouses(src.spouse);
   const root = {
     id: 'root',
     label: rootLabel || 'Root',
     image: src.image || '',
+    isOrigin: !!src.isOrigin || inferOriginByName(src.Grandparent),
     spouses: rootSpouses,
     meta: { type: 'root' },
     children: []
@@ -1541,6 +2319,7 @@ function buildRFamilyTree(src) {
       id: `p-${parentIndex}`,
       label: formatCoupleLabel(p.name, null),
       image: p.image || '',
+      isOrigin: !!p.isOrigin || inferOriginByName(p.name),
       spouses: parentSpouses,
       fromSpouseIndex: parentFromSpouseIndex,
       fromPrevSpouse: !!p.fromPrevSpouse || parentFromSpouseIndex > 0,
@@ -1559,6 +2338,7 @@ function buildRFamilyTree(src) {
         id: `c-${parentIndex}-${childIndex}`,
         label: formatCoupleLabel(k.name, null),
         image: k.image || '',
+        isOrigin: !!k.isOrigin || inferOriginByName(k.name),
         spouses: childSpouses,
         fromSpouseIndex,
         fromPrevSpouse: !!k.fromPrevSpouse || fromSpouseIndex > 0,
@@ -1576,6 +2356,7 @@ function buildRFamilyTree(src) {
           id: `g-${parentIndex}-${childIndex}-${grandIndex}`,
           label: safeText(g.name) || 'Member',
           image: g.image || '',
+          isOrigin: !!g.isOrigin || inferOriginByName(g.name),
           fromSpouseIndex: grandFromSpouseIndex,
           fromPrevSpouse: !!g.fromPrevSpouse || grandFromSpouseIndex > 0,
           meta: { type: 'grandchild', parentIndex, childIndex, grandIndex, addable: false },
@@ -1615,9 +2396,42 @@ function extractSpouses(spouseData) {
 
 function wrapRFamilyNodeWithParents(node, parentsData, targetMeta) {
   if (!parentsData || typeof parentsData !== 'object') return node;
-  const parentSpouses = extractSpouses(parentsData.spouse);
+  const rawParentSpouses = extractSpouses(parentsData.spouse);
+  const parentSpouses = rawParentSpouses.length > 0 ? [rawParentSpouses[0]] : [];
+  const legacyOverflowParents = rawParentSpouses
+    .slice(1)
+    .map((entry) => {
+      if (!entry) return null;
+      if (typeof entry === 'string') {
+        const name = safeText(entry);
+        return name ? { name, image: '', birthday: '' } : null;
+      }
+      const name = safeText(entry.name);
+      if (!name) return null;
+      return {
+        name,
+        image: safeText(entry.image),
+        birthday: safeText(entry.birthday)
+      };
+    })
+    .filter(Boolean);
+
+  let higherParents = (parentsData.parents && typeof parentsData.parents === 'object')
+    ? parentsData.parents
+    : null;
+  if (!higherParents && legacyOverflowParents.length > 0) {
+    for (let i = legacyOverflowParents.length - 1; i >= 0; i -= 1) {
+      higherParents = {
+        ...legacyOverflowParents[i],
+        parents: higherParents
+      };
+    }
+  }
+
+  const rawDepth = Number(targetMeta && targetMeta.ancestorDepth);
+  const ancestorDepth = Number.isFinite(rawDepth) ? Math.max(0, Math.trunc(rawDepth)) : 0;
   const spouseIndex = getNodeSpouseIndex(node);
-  return {
+  const ancestorNode = {
     id: `ancestor-${node.id}`,
     label: formatCoupleLabel(parentsData.name, null) || 'Parent',
     image: parentsData.image || '',
@@ -1629,10 +2443,18 @@ function wrapRFamilyNodeWithParents(node, parentsData, targetMeta) {
       targetType: targetMeta.type,
       parentIndex: targetMeta.parentIndex,
       childIndex: targetMeta.childIndex,
-      grandIndex: targetMeta.grandIndex
+      grandIndex: targetMeta.grandIndex,
+      ancestorDepth
     },
     children: [node]
   };
+  return wrapRFamilyNodeWithParents(ancestorNode, higherParents, {
+    type: targetMeta.type,
+    parentIndex: targetMeta.parentIndex,
+    childIndex: targetMeta.childIndex,
+    grandIndex: targetMeta.grandIndex,
+    ancestorDepth: ancestorDepth + 1
+  });
 }
 
 function buildCoupleTree(node, path) {
@@ -1647,6 +2469,7 @@ function buildCoupleTree(node, path) {
     id: `n-${path.join('-') || 'root'}`,
     label: label || 'Member',
     image: node.image || '',
+    isOrigin: !!node.isOrigin,
     spouses: spouses,
     fromSpouseIndex,
     fromPrevSpouse: !!node.fromPrevSpouse || fromSpouseIndex > 0,
@@ -1707,7 +2530,8 @@ function addMemberAt(meta, memberData) {
   try {
     treeData = JSON.parse(jsonEditor.value || '{}');
   } catch (e) {
-    alert('JSON is invalid. Fix it before adding members.');
+    showJsonStatus('JSON is invalid. Fix it before adding members.', 'invalid');
+    notifyUser('JSON is invalid. Fix it before adding members.', 'warning');
     return;
   }
 
@@ -1833,6 +2657,10 @@ function addMemberAt(meta, memberData) {
           }
           child.spouse.push(newMember);
         }
+      } else if (relation === 'parent') {
+        const spouseRecord = getRFamilySpouseRecord(treeData, meta, false);
+        if (!spouseRecord) return;
+        addOrAppendParent(spouseRecord, newMember);
       } else if (relation === 'child') {
         // Add child to the person that this spouse is linked to
         const spouseIndex = Number.isFinite(Number(meta.spouseIndex)) ? Math.max(0, Math.trunc(Number(meta.spouseIndex))) : 0;
@@ -1886,7 +2714,7 @@ function addMemberAt(meta, memberData) {
 
   jsonEditor.value = JSON.stringify(treeData, null, 2);
   markAsChanged();
-  scheduleVisualRender(false);
+  scheduleVisualRender(true);
 }
 
 function getRFamilyParent(treeData, parentIndex) {
@@ -1949,6 +2777,20 @@ function getRFamilyGrandchild(treeData, parentIndex, childIndex, grandIndex) {
 
 function getRFamilyTargetNode(treeData, meta) {
   const targetType = meta.type === 'ancestor' ? meta.targetType : meta.type;
+  if (targetType === 'spouse') {
+    const spouseMeta = (meta && meta.spouseMeta && typeof meta.spouseMeta === 'object')
+      ? meta.spouseMeta
+      : {
+        parentType: meta.parentType,
+        targetType: meta.parentTargetType,
+        parentIndex: meta.parentIndex,
+        childIndex: meta.childIndex,
+        grandIndex: meta.grandIndex,
+        spouseIndex: meta.spouseIndex,
+        ancestorDepth: meta.ancestorDepth
+      };
+    return getRFamilySpouseRecord(treeData, spouseMeta, false);
+  }
   if (targetType === 'root') return treeData;
   if (targetType === 'parent') return getRFamilyParent(treeData, meta.parentIndex);
   if (targetType === 'child') return getRFamilyChild(treeData, meta.parentIndex, meta.childIndex);
@@ -1978,7 +2820,32 @@ function addOrAppendParent(target, newMember) {
     Object.assign(parentsData, newMember);
     return;
   }
-  addSpouseToParentsData(parentsData, newMember);
+  addOrAppendParent(parentsData, newMember);
+}
+
+function normalizeAncestorDepth(meta) {
+  const rawDepth = Number(meta && meta.ancestorDepth);
+  if (!Number.isFinite(rawDepth)) return 0;
+  return Math.max(0, Math.trunc(rawDepth));
+}
+
+function getParentsAtDepth(target, depth, createIfMissing) {
+  if (!target || typeof target !== 'object') return null;
+  const normalizedDepth = Number.isFinite(Number(depth))
+    ? Math.max(0, Math.trunc(Number(depth)))
+    : 0;
+  let cursor = target;
+  for (let level = 0; level <= normalizedDepth; level += 1) {
+    if (!cursor.parents || typeof cursor.parents !== 'object') {
+      if (!createIfMissing) return null;
+      cursor.parents = { name: '', image: '', birthday: '' };
+    }
+    if (level === normalizedDepth) {
+      return cursor.parents;
+    }
+    cursor = cursor.parents;
+  }
+  return null;
 }
 
 function getRFamilyParentsData(treeData, meta, createIfMissing) {
@@ -1989,16 +2856,15 @@ function getRFamilyParentsData(treeData, meta, createIfMissing) {
       targetType: meta.targetType,
       parentIndex: meta.parentIndex,
       childIndex: meta.childIndex,
-      grandIndex: meta.grandIndex
+      grandIndex: meta.grandIndex,
+      spouseMeta: meta.spouseMeta,
+      ancestorDepth: meta.ancestorDepth
     };
   }
   const target = getRFamilyTargetNode(treeData, targetMeta);
   if (!target) return null;
-  if (!target.parents || typeof target.parents !== 'object') {
-    if (!createIfMissing) return null;
-    target.parents = { name: '', image: '', birthday: '' };
-  }
-  return target.parents;
+  const depth = normalizeAncestorDepth(targetMeta);
+  return getParentsAtDepth(target, depth, createIfMissing);
 }
 
 function getCoupleNodeByPath(treeData, path) {
@@ -2010,14 +2876,50 @@ function getCoupleNodeByPath(treeData, path) {
   return node;
 }
 
+function isOriginMemberAtMeta(treeData, meta) {
+  if (!treeData || !meta) return false;
+
+  if (looksLikeRFamilySchema(treeData)) {
+    if (meta.type === 'root') return !!treeData.isOrigin;
+    if (meta.type === 'ancestor' || meta.type === 'spouse') return false;
+    const target = getRFamilyTargetNode(treeData, meta);
+    return !!(target && target.isOrigin);
+  }
+
+  if (meta.type === 'couple') {
+    const target = getCoupleNodeByPath(treeData, meta.path || []);
+    return !!(target && target.isOrigin);
+  }
+
+  return false;
+}
+
+function normalizeSpouseEntriesForStorage(spouses) {
+  const list = Array.isArray(spouses) ? spouses.filter(Boolean) : [];
+  if (!list.length) return null;
+  if (list.length === 1) return list[0];
+  return list;
+}
+
 // ============ DELETE MEMBER ============
 
 function deleteMember(meta) {
   if (!meta) return;
 
-  // Don't allow deleting root
-  if (meta.type === 'root') {
-    alert('Cannot delete the root person');
+  const jsonEditor = document.getElementById('jsonEditor');
+  if (!jsonEditor) return;
+
+  let treeData;
+  try {
+    treeData = JSON.parse(jsonEditor.value || '{}');
+  } catch (e) {
+    showJsonStatus('JSON is invalid. Fix it before deleting members.', 'invalid');
+    notifyUser('JSON is invalid. Fix it before deleting members.', 'warning');
+    return;
+  }
+
+  if (isOriginMemberAtMeta(treeData, meta)) {
+    notifyUser('Cannot delete the selected root person.', 'warning');
     return;
   }
 
@@ -2044,13 +2946,55 @@ function performDelete() {
   try {
     treeData = JSON.parse(jsonEditor.value || '{}');
   } catch (e) {
-    alert('JSON is invalid. Fix it before deleting members.');
+    showJsonStatus('JSON is invalid. Fix it before deleting members.', 'invalid');
+    notifyUser('JSON is invalid. Fix it before deleting members.', 'warning');
     hideDeleteConfirmModal();
     return;
   }
 
   if (looksLikeRFamilySchema(treeData)) {
-    if (meta.type === 'spouse') {
+    if (meta.type === 'root') {
+      const spouses = extractSpouses(treeData.spouse);
+      if (!spouses.length) {
+        notifyUser('Cannot delete this person because no replacement root is available. Add a spouse first.', 'warning');
+        hideDeleteConfirmModal();
+        return;
+      }
+
+      const replacement = spouses[0];
+      const replacementName = safeText(replacement && replacement.name ? replacement.name : replacement);
+      if (!replacementName) {
+        notifyUser('Cannot delete this person because the replacement root has no name.', 'warning');
+        hideDeleteConfirmModal();
+        return;
+      }
+
+      const remainingSpouses = spouses.slice(1).map((entry) => {
+        if (typeof entry === 'string') {
+          return { name: safeText(entry), image: '', birthday: '' };
+        }
+        return {
+          ...entry,
+          name: safeText(entry.name)
+        };
+      }).filter((entry) => safeText(entry && entry.name));
+
+      treeData.Grandparent = replacementName;
+      treeData.image = safeText(replacement && replacement.image);
+      treeData.birthday = safeText(replacement && replacement.birthday);
+      const replacementTags = Array.isArray(replacement && replacement.tags)
+        ? replacement.tags
+          .map((tag) => safeText(tag))
+          .filter((tag) => tag.length > 0)
+        : (safeText(replacement && replacement.tags)
+          ? [safeText(replacement && replacement.tags)]
+          : []);
+      treeData.tags = replacementTags;
+      treeData.spouse = normalizeSpouseEntriesForStorage(remainingSpouses);
+      if (!replacementTags.length) {
+        delete treeData.tags;
+      }
+    } else if (meta.type === 'spouse') {
       // Delete spouse from array based on parent type
       const spouseIndex = meta.spouseIndex !== undefined ? meta.spouseIndex : 0;
       if (meta.parentType === 'root') {
@@ -2076,7 +3020,15 @@ function performDelete() {
     } else if (meta.type === 'ancestor') {
       const target = getRFamilyTargetNode(treeData, meta);
       if (target) {
-        target.parents = null;
+        const depth = normalizeAncestorDepth(meta);
+        if (depth <= 0) {
+          target.parents = null;
+        } else {
+          const parentLevel = getParentsAtDepth(target, depth - 1, false);
+          if (parentLevel && typeof parentLevel === 'object') {
+            parentLevel.parents = null;
+          }
+        }
       }
     } else if (meta.type === 'parent') {
       // Delete parent from array
@@ -2111,7 +3063,7 @@ function performDelete() {
 
   jsonEditor.value = JSON.stringify(treeData, null, 2);
   markAsChanged();
-  scheduleVisualRender(false);
+  scheduleVisualRender(true);
   hideDeleteConfirmModal();
 }
 
@@ -2120,7 +3072,6 @@ function performDelete() {
 function initAddMemberUI() {
   const popup = document.getElementById('addMemberPopup');
   const modal = document.getElementById('addMemberModal');
-  const expandBtn = popup?.querySelector('.add-member-expand-btn');
   
   if (!popup || !modal) return;
 
@@ -2131,14 +3082,10 @@ function initAddMemberUI() {
     }
   });
 
-  expandBtn?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    popup.classList.toggle('is-active');
-  });
-
   // Popup item clicks
-  popup.querySelectorAll('.add-member-popup-item').forEach(item => {
-    item.addEventListener('click', () => {
+  popup.querySelectorAll('.add-member-popup-item').forEach((item) => {
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
       pendingAddRelation = item.dataset.relation;
       hideAddMemberPopup();
       showAddMemberModal(pendingAddRelation);
@@ -2155,6 +3102,12 @@ function initAddMemberUI() {
   const photoInput = document.getElementById('memberPhotoInput');
   photoPreview?.addEventListener('click', () => photoInput?.click());
   photoInput?.addEventListener('change', handleMemberPhotoSelect);
+  document.getElementById('memberFirstName')?.addEventListener('input', (event) => {
+    setInvalidField(event.target, false);
+  });
+  document.getElementById('memberLastName')?.addEventListener('input', (event) => {
+    setInvalidField(event.target, false);
+  });
 
   // Visited countries rows
   document.getElementById('addVisitedCountryBtn')?.addEventListener('click', () => {
@@ -2174,42 +3127,64 @@ function showAddMemberPopup(event, meta) {
   if (!popup) return;
 
   pendingAddMemberMeta = meta;
+  pendingAddRelation = null;
 
-  // Add active class to the clicked + button (SVG element)
-  if (event.currentTarget) {
-    d3.select(event.currentTarget).classed('active', true);
+  document.querySelectorAll('.node-add.active').forEach((btn) => {
+    d3.select(btn).classed('active', false);
+  });
+
+  const anchorElement = event?.currentTarget;
+  if (anchorElement && anchorElement.classList && anchorElement.classList.contains('node-add')) {
+    d3.select(anchorElement).classed('active', true);
   }
 
-  // Get the position from the click event (which comes from the SVG + button)
-  const x = event.clientX || event.pageX;
-  const y = event.clientY || event.pageY;
-  const popupSize = 200;
+  let anchorX = Number(event?.clientX ?? event?.pageX);
+  let anchorY = Number(event?.clientY ?? event?.pageY);
+  if (anchorElement && typeof anchorElement.getBoundingClientRect === 'function') {
+    const rect = anchorElement.getBoundingClientRect();
+    if (Number.isFinite(rect.left) && Number.isFinite(rect.top)) {
+      anchorX = rect.right + 8;
+      anchorY = rect.top + (rect.height / 2);
+    }
+  }
+  if (!Number.isFinite(anchorX) || !Number.isFinite(anchorY)) return;
+
+  popup.classList.add('show');
+  popup.style.visibility = 'hidden';
+  popup.style.left = '0px';
+  popup.style.top = '0px';
+
+  const popupRect = popup.getBoundingClientRect();
+  const popupWidth = Math.max(1, popupRect.width || 0);
+  const popupHeight = Math.max(1, popupRect.height || 0);
   const viewportPadding = 12;
 
-  let adjustedX = x - popupSize / 2;
-  let adjustedY = y - popupSize / 2;
+  let adjustedX = anchorX;
+  let adjustedY = anchorY - (popupHeight / 2);
 
-  if (adjustedX < viewportPadding) adjustedX = viewportPadding;
-  if (adjustedY < viewportPadding) adjustedY = viewportPadding;
-  if (adjustedX + popupSize > window.innerWidth - viewportPadding) {
-    adjustedX = Math.max(viewportPadding, window.innerWidth - popupSize - viewportPadding);
-  }
-  if (adjustedY + popupSize > window.innerHeight - viewportPadding) {
-    adjustedY = Math.max(viewportPadding, window.innerHeight - popupSize - viewportPadding);
+  if (adjustedX + popupWidth > window.innerWidth - viewportPadding) {
+    adjustedX = anchorX - popupWidth - 12;
   }
 
-  // Position popup with center aligned to the click point
-  popup.style.left = `${adjustedX}px`;
-  popup.style.top = `${adjustedY}px`;
-  popup.classList.add('show');
-  popup.classList.add('is-active');
+  adjustedX = Math.min(
+    Math.max(viewportPadding, adjustedX),
+    Math.max(viewportPadding, window.innerWidth - popupWidth - viewportPadding)
+  );
+  adjustedY = Math.min(
+    Math.max(viewportPadding, adjustedY),
+    Math.max(viewportPadding, window.innerHeight - popupHeight - viewportPadding)
+  );
+
+  popup.style.left = `${Math.round(adjustedX)}px`;
+  popup.style.top = `${Math.round(adjustedY)}px`;
+  popup.style.visibility = '';
 }
 
 function hideAddMemberPopup() {
   const popup = document.getElementById('addMemberPopup');
   if (popup) {
     popup.classList.remove('show');
-    popup.classList.remove('is-active');
+    popup.style.visibility = '';
     document.querySelectorAll('.node-add.active').forEach(btn => {
       d3.select(btn).classed('active', false);
     });
@@ -2263,13 +3238,14 @@ function showEditMemberModal(meta) {
   try {
     treeData = JSON.parse(jsonEditor.value || '{}');
   } catch (e) {
-    alert('JSON is invalid. Fix it before editing members.');
+    showJsonStatus('JSON is invalid. Fix it before editing members.', 'invalid');
+    notifyUser('JSON is invalid. Fix it before editing members.', 'warning');
     return;
   }
 
   const existing = getMemberAtMeta(treeData, meta);
   if (!existing) {
-    alert('Could not load this person for editing.');
+    notifyUser('Could not load this person for editing.', 'error');
     return;
   }
 
@@ -2311,6 +3287,8 @@ function resetAddMemberForm() {
   if (firstNameInput) firstNameInput.value = '';
   if (lastNameInput) lastNameInput.value = '';
   if (birthdayInput) birthdayInput.value = '';
+  setInvalidField(firstNameInput, false);
+  setInvalidField(lastNameInput, false);
 
   updateMemberPhotoPreview('');
 
@@ -2331,6 +3309,8 @@ function fillMemberForm(memberData) {
   if (firstNameInput) firstNameInput.value = nameParts.firstName;
   if (lastNameInput) lastNameInput.value = nameParts.lastName;
   if (birthdayInput) birthdayInput.value = memberData?.birthday || '';
+  setInvalidField(firstNameInput, false);
+  setInvalidField(lastNameInput, false);
 
   updateMemberPhotoPreview(memberData?.image || '');
 
@@ -2341,16 +3321,40 @@ function fillMemberForm(memberData) {
   renderVisitedCountryRows();
 }
 
-function handleMemberPhotoSelect(event) {
+async function handleMemberPhotoSelect(event) {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
 
-  const reader = new FileReader();
-  reader.onload = (loadEvent) => {
-    const result = typeof loadEvent.target?.result === 'string' ? loadEvent.target.result : '';
-    updateMemberPhotoPreview(result);
-  };
-  reader.readAsDataURL(file);
+  if (!file.type || !file.type.startsWith('image/')) {
+    notifyUser('Please select a valid image file.', 'warning');
+    event.target.value = '';
+    return;
+  }
+
+  try {
+    const rawDataUrl = await readFileAsDataUrl(file);
+    const optimized = await compressImageDataUrl(rawDataUrl, {
+      maxBytes: MEMBER_IMAGE_MAX_BYTES,
+      maxDimension: MEMBER_IMAGE_MAX_DIMENSION,
+      minDimension: MEMBER_IMAGE_MIN_DIMENSION
+    });
+
+    if (!optimized) {
+      notifyUser('This photo is still too large after compression. Please choose a smaller image.', 'warning');
+      event.target.value = '';
+      return;
+    }
+
+    updateMemberPhotoPreview(optimized);
+
+    if (getUtf8Size(rawDataUrl) > getUtf8Size(optimized)) {
+      notifyUser('Photo optimized to keep tree size within Firestore limits.', 'info', { duration: 3200 });
+    }
+  } catch (error) {
+    console.error('Failed to process uploaded photo:', error);
+    notifyUser('Could not read this image. Please try another file.', 'error');
+    event.target.value = '';
+  }
 }
 
 function updateMemberPhotoPreview(imageValue) {
@@ -2458,14 +3462,18 @@ function collectMemberFormData() {
   const lastNameEl = document.getElementById('memberLastName');
   const birthdayEl = document.getElementById('memberBirthday');
   if (!firstNameEl || !lastNameEl || !birthdayEl) {
-    alert('Error: Form elements not found');
+    notifyUser('Form is missing required inputs. Please refresh and try again.');
     return null;
   }
 
   const firstName = firstNameEl.value.trim();
   const lastName = lastNameEl.value.trim();
+  setInvalidField(firstNameEl, false);
+  setInvalidField(lastNameEl, false);
   if (!firstName || !lastName) {
-    alert('Please fill in both First Name and Last Name');
+    if (!firstName) setInvalidField(firstNameEl, true);
+    if (!lastName) setInvalidField(lastNameEl, true);
+    notifyUser('Please fill in both First Name and Last Name.', 'warning');
     return null;
   }
 
@@ -2483,7 +3491,7 @@ function confirmMemberModal() {
 
   if (memberModalMode === 'edit') {
     if (!pendingEditMeta) {
-      alert('Error: Could not determine which member to edit.');
+      notifyUser('Could not determine which member to edit.');
       return;
     }
     const updated = updateMemberAt(pendingEditMeta, memberData);
@@ -2495,7 +3503,7 @@ function confirmMemberModal() {
   }
 
   if (!pendingAddMemberMeta) {
-    alert('Error: Could not determine where to add member.');
+    notifyUser('Could not determine where to add this member.');
     return;
   }
 
@@ -2548,6 +3556,31 @@ function getRFamilySpouseContainer(treeData, meta) {
     return getRFamilyGrandchild(treeData, meta.parentIndex, meta.childIndex, meta.grandIndex);
   }
   return null;
+}
+
+function getRFamilySpouseRecord(treeData, meta, createIfMissing) {
+  const container = getRFamilySpouseContainer(treeData, meta);
+  if (!container || typeof container !== 'object') return null;
+
+  if (!Array.isArray(container.spouse)) {
+    container.spouse = container.spouse ? [container.spouse] : [];
+  }
+
+  const spouseIndex = normalizeIndex(meta && meta.spouseIndex);
+  if (spouseIndex >= container.spouse.length) {
+    if (!createIfMissing) return null;
+    while (container.spouse.length <= spouseIndex) {
+      container.spouse.push({ name: '', image: '', birthday: '' });
+    }
+  }
+
+  const current = container.spouse[spouseIndex];
+  const spouseRecord = (current && typeof current === 'object')
+    ? current
+    : { name: safeText(current) };
+  container.spouse[spouseIndex] = spouseRecord;
+
+  return spouseRecord;
 }
 
 function getMemberAtMeta(treeData, meta) {
@@ -2613,19 +3646,9 @@ function applyMemberUpdateAtMeta(treeData, meta, memberData) {
       return applyMemberFields(parentsData, memberData);
     }
     if (meta.type === 'spouse') {
-      const container = getRFamilySpouseContainer(treeData, meta);
-      if (!container) return false;
-      if (!Array.isArray(container.spouse)) {
-        container.spouse = container.spouse ? [container.spouse] : [];
-      }
-      const spouseIndex = normalizeIndex(meta.spouseIndex);
-      if (spouseIndex >= container.spouse.length) return false;
-      const current = container.spouse[spouseIndex];
-      const spouseRecord = (current && typeof current === 'object')
-        ? current
-        : { name: safeText(current) };
+      const spouseRecord = getRFamilySpouseRecord(treeData, meta, false);
+      if (!spouseRecord) return false;
       applyMemberFields(spouseRecord, memberData);
-      container.spouse[spouseIndex] = spouseRecord;
       return true;
     }
     const target = getRFamilyTargetNode(treeData, meta);
@@ -2668,13 +3691,14 @@ function updateMemberAt(meta, memberData) {
   try {
     treeData = JSON.parse(jsonEditor.value || '{}');
   } catch (e) {
-    alert('JSON is invalid. Fix it before editing members.');
+    showJsonStatus('JSON is invalid. Fix it before editing members.', 'invalid');
+    notifyUser('JSON is invalid. Fix it before editing members.', 'warning');
     return false;
   }
 
   const updated = applyMemberUpdateAtMeta(treeData, meta, memberData);
   if (!updated) {
-    alert('Could not save changes for this person.');
+    notifyUser('Could not save changes for this person.', 'error');
     return false;
   }
 

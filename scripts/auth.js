@@ -258,6 +258,18 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
+  function getNetworkRequestErrorMessage() {
+    const firebaseState = window.AncestrioFirebase || {};
+    if (firebaseState.isDevelopment) {
+      const emulatorUrl = firebaseState.authEmulatorUrl || 'http://localhost:9099';
+      const reachabilityHint = firebaseState.authEmulatorReachable === false
+        ? ' The emulator appears to be offline.'
+        : '';
+      return `Could not reach the Firebase Auth emulator at ${emulatorUrl}.${reachabilityHint} Start it with "firebase emulators:start --only auth,firestore", or open this page with ?emulator=0 to use production Firebase.`;
+    }
+    return 'Network error. Please check your connection.';
+  }
+
   function getErrorMessage(code) {
     const messages = {
       'auth/email-already-in-use': 'This email or username is already registered.',
@@ -270,7 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
       'auth/invalid-login-credentials': 'Invalid credentials. Check email/username and password.',
       'auth/invalid-credential': 'Invalid credentials. Check email/username and password.',
       'auth/too-many-requests': 'Too many failed attempts. Please try again later.',
-      'auth/network-request-failed': 'Network error. Please check your connection.',
+      'auth/network-request-failed': getNetworkRequestErrorMessage(),
       'auth/popup-blocked': 'Popup was blocked. Allow popups for this site and try Google sign-in again.',
       'auth/popup-closed-by-user': 'Google sign-in was cancelled before completion.',
       'auth/cancelled-popup-request': 'Another sign-in popup was opened. Close extra popups and try again.',

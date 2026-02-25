@@ -15,18 +15,70 @@ const firebaseConfig = {
 let app, auth, db, storage;
 
 // Check if running locally
-const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-// Set to true to use emulator, false to use production
-const useEmulator = false; // BYPASS: Set to false for production Firebase testing
-const isDevelopment = isLocalhost && useEmulator;
+const LOCAL_LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+const isLocalhost = LOCAL_LOOPBACK_HOSTS.has(window.location.hostname);
+const emulatorFlag = new URLSearchParams(window.location.search).get('emulator');
+const useEmulator = isLocalhost && (emulatorFlag === '1' || emulatorFlag === 'true');
+const isDevelopment = useEmulator;
+const emulatorHost = window.location.hostname === '127.0.0.1' ? '127.0.0.1' : 'localhost';
+const authEmulatorUrl = `http://${emulatorHost}:9099`;
+
+window.AncestrioFirebase = window.AncestrioFirebase || {};
+window.AncestrioFirebase.isDevelopment = isDevelopment;
+window.AncestrioFirebase.authEmulatorUrl = authEmulatorUrl;
+window.AncestrioFirebase.authEmulatorReachable = null;
+
+function notifyUser(message, type = 'error', options = {}) {
+  if (window.AncestrioRuntime && typeof window.AncestrioRuntime.notify === 'function') {
+    window.AncestrioRuntime.notify(message, type, options);
+    return;
+  }
+  if (type === 'error') {
+    console.error(message);
+  } else {
+    console.warn(message);
+  }
+}
+
+function probeAuthEmulator(url) {
+  if (typeof fetch !== 'function') return;
+
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  const timeoutId = setTimeout(() => {
+    if (controller) {
+      controller.abort();
+    }
+  }, 2000);
+
+  fetch(`${url}/`, {
+    method: 'GET',
+    mode: 'no-cors',
+    cache: 'no-store',
+    signal: controller ? controller.signal : undefined
+  }).then(() => {
+    window.AncestrioFirebase.authEmulatorReachable = true;
+    console.log(`Auth emulator is reachable at ${url}`);
+  }).catch((error) => {
+    window.AncestrioFirebase.authEmulatorReachable = false;
+    const detail = error && error.message ? error.message : String(error || 'unknown error');
+    console.warn(`Auth emulator probe failed at ${url}: ${detail}`);
+    notifyUser(
+      `Auth emulator is not reachable at ${url}. Start it with "firebase emulators:start --only auth,firestore".`,
+      'warning',
+      { duration: 9000 }
+    );
+  }).finally(() => {
+    clearTimeout(timeoutId);
+  });
+}
 
 function initializeFirebase() {
   if (typeof firebase === 'undefined') {
     console.error('Firebase SDK not loaded - script tag missing or blocked');
-    alert('Firebase SDK failed to load. Please check your internet connection and disable any ad blockers.');
+    notifyUser('Firebase SDK failed to load. Please check your internet connection and disable ad blockers.');
     return false;
   }
-  
+
   try {
     console.log('Environment:', isDevelopment ? 'LOCAL EMULATOR' : 'PRODUCTION');
     console.log('Initializing Firebase with config:', {
@@ -34,47 +86,53 @@ function initializeFirebase() {
       authDomain: firebaseConfig.authDomain,
       environment: isDevelopment ? 'emulator' : 'production'
     });
-    
-    app = firebase.initializeApp(firebaseConfig);
+
+    if (firebase.apps && firebase.apps.length) {
+      app = firebase.app();
+    } else {
+      app = firebase.initializeApp(firebaseConfig);
+    }
+
     auth = firebase.auth();
     db = firebase.firestore();
-    
+
     // Connect to emulators if running locally
     if (isDevelopment) {
       console.log('Connecting to Firebase Emulators...');
-      
+
       // Disable SSL error bypass for emulator
       auth.settings.appVerificationDisabledForTesting = true;
-      
+
       try {
-        // Connect to Auth Emulator (use 127.0.0.1 for consistency)
-        auth.useEmulator('http://127.0.0.1:9099');
-        console.log('✓ Connected to Auth Emulator on port 9099');
+        // Configure Auth Emulator endpoint.
+        auth.useEmulator(authEmulatorUrl);
+        console.log(`Auth emulator configured at ${authEmulatorUrl}`);
+        probeAuthEmulator(authEmulatorUrl);
       } catch (e) {
         console.error('Auth emulator connection failed:', e.message);
       }
-      
+
       try {
-        // Connect to Firestore Emulator
-        db.useEmulator('127.0.0.1', 8080);
-        console.log('✓ Connected to Firestore Emulator on port 8080');
+        // Configure Firestore Emulator endpoint.
+        db.useEmulator(emulatorHost, 8080);
+        console.log(`Firestore emulator configured at ${emulatorHost}:8080`);
       } catch (e) {
         console.error('Firestore emulator connection failed:', e.message);
       }
-      
+
       try {
-        // Connect to Storage Emulator
+        // Configure Storage Emulator endpoint.
         if (firebase.storage) {
-          firebase.storage().useEmulator('127.0.0.1', 5001);
-          console.log('✓ Connected to Storage Emulator on port 5001');
+          firebase.storage().useEmulator(emulatorHost, 5001);
+          console.log(`Storage emulator configured at ${emulatorHost}:5001`);
         }
       } catch (e) {
         console.warn('Storage emulator connection:', e.message);
       }
-      
-      console.log('📍 All emulator connections attempted');
+
+      console.log('All emulator endpoints configured');
     }
-    
+
     // Only initialize storage if the SDK is loaded
     if (firebase.storage) {
       storage = firebase.storage();
@@ -85,7 +143,7 @@ function initializeFirebase() {
     return true;
   } catch (error) {
     console.error('Error initializing Firebase:', error);
-    alert('Firebase initialization failed: ' + error.message);
+    notifyUser('Firebase initialization failed: ' + error.message, 'error', { duration: 7000 });
     return false;
   }
 }

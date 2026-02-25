@@ -16,6 +16,18 @@ function showErrorText(errorEl, message) {
   window.AncestrioDomDisplay.show(errorEl);
 }
 
+function notifyUser(message, type = 'error', options = {}) {
+  if (window.AncestrioRuntime && typeof window.AncestrioRuntime.notify === 'function') {
+    window.AncestrioRuntime.notify(message, type, options);
+    return;
+  }
+  if (type === 'error') {
+    console.error(message);
+  } else {
+    console.warn(message);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   // Theme toggle
   window.AncestrioTheme?.initThemeToggle();
@@ -483,30 +495,6 @@ function updateSplitNameListState(list) {
   if (!list) return;
   const rowCount = list.querySelectorAll('.person-row').length;
   list.classList.toggle('has-multiple-rows', rowCount > 1);
-}
-
-function collectNames(listId) {
-  const list = document.getElementById(listId);
-  if (!list) return [];
-  const names = [];
-  list.querySelectorAll('input.person-row-input').forEach((input) => {
-    const value = (input.value || '').trim();
-    if (value) names.push(value);
-  });
-  return names;
-}
-
-function collectSplitNames(listId) {
-  const list = document.getElementById(listId);
-  if (!list) return [];
-  const names = [];
-  list.querySelectorAll('.person-row').forEach((row) => {
-    const firstName = row.querySelector('input[data-name-part="first"]')?.value || '';
-    const lastName = row.querySelector('input[data-name-part="last"]')?.value || '';
-    const fullName = combineNames(firstName, lastName);
-    if (fullName) names.push(fullName);
-  });
-  return names;
 }
 
 function collectSplitPeople(listId) {
@@ -1277,7 +1265,7 @@ async function createTreeFromWizard(e) {
     window.location.href = `editor.html?id=${docRef.id}`;
   } catch (error) {
     console.error('Error creating tree:', error);
-    alert('Failed to create tree. Please try again.');
+    notifyUser('Failed to create tree. Please try again.', 'error');
   } finally {
     if (createBtn) createBtn.disabled = false;
     updateWizardNavigation();
@@ -1294,20 +1282,6 @@ function buildPersonNode(name, extras = {}) {
     image: sanitizeText(extras.image),
     birthday: sanitizeText(extras.birthdate)
   };
-}
-
-function createSinglePersonTree(options) {
-  const center = buildPersonNode(options.centerName, {
-    image: options.centerPhotoUrl,
-    birthdate: options.centerBirthdate
-  });
-  const data = {
-    Grandparent: center.name,
-    image: center.image,
-    birthday: center.birthday,
-    Parent: []
-  };
-  return data;
 }
 
 function generateFamilyTemplate(options) {
@@ -1349,6 +1323,7 @@ function generateFamilyTemplate(options) {
     image: center.image,
     birthdate: center.birthday
   });
+  centerNode.isOrigin = true;
 
   if (partnerName) {
     centerNode.spouse = buildPersonNode(partnerName, { birthdate: partnerBirthdate });
@@ -1402,6 +1377,7 @@ function generateFamilyTemplate(options) {
       Grandparent: center.name,
       image: center.image,
       birthday: center.birthday,
+      isOrigin: true,
       Parent: childNodes
     };
     if (partnerName) {
@@ -1448,7 +1424,7 @@ async function confirmDelete() {
     await loadTrees();
   } catch (error) {
     console.error('Error deleting tree:', error);
-    alert('Failed to delete tree. Please try again.');
+    notifyUser('Failed to delete tree. Please try again.', 'error');
   } finally {
     confirmBtn.disabled = false;
     confirmBtn.textContent = 'Delete';
@@ -1467,7 +1443,7 @@ async function logout() {
     window.location.href = 'auth.html';
   } catch (error) {
     console.error('Error signing out:', error);
-    alert('Failed to sign out. Please try again.');
+    notifyUser('Failed to sign out. Please try again.', 'error');
   }
 }
 

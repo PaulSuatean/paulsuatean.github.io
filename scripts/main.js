@@ -110,6 +110,8 @@
   let applyMobileState = null;
   let upcomingBirthdaysList = [];
   let upcomingCurrentIndex = 0;
+  let externalUpcomingController = null;
+  let externalEmptyStateController = null;
 
   const person = {
     width: 170,
@@ -400,6 +402,10 @@
   if (upcomingPrev) {
     upcomingPrev.addEventListener('click', (e) => {
       e.stopPropagation();
+      if (externalUpcomingController && typeof externalUpcomingController.previous === 'function') {
+        externalUpcomingController.previous();
+        return;
+      }
       if (upcomingBirthdaysList.length > 0) {
         upcomingCurrentIndex = (upcomingCurrentIndex - 1 + upcomingBirthdaysList.length) % upcomingBirthdaysList.length;
         renderUpcomingBirthdayButton();
@@ -409,6 +415,10 @@
   if (upcomingNext) {
     upcomingNext.addEventListener('click', (e) => {
       e.stopPropagation();
+      if (externalUpcomingController && typeof externalUpcomingController.next === 'function') {
+        externalUpcomingController.next();
+        return;
+      }
       if (upcomingBirthdaysList.length > 0) {
         upcomingCurrentIndex = (upcomingCurrentIndex + 1) % upcomingBirthdaysList.length;
         renderUpcomingBirthdayButton();
@@ -417,6 +427,10 @@
   }
   if (upcomingBtn) {
     upcomingBtn.addEventListener('click', () => {
+      if (externalUpcomingController && typeof externalUpcomingController.openCurrent === 'function') {
+        externalUpcomingController.openCurrent();
+        return;
+      }
       if (upcomingBirthdaysList.length > 0) {
         const birthday = upcomingBirthdaysList[upcomingCurrentIndex];
         const info = personLookup.get(birthday.name);
@@ -433,10 +447,9 @@
   }
 
   let currentView = localStorage.getItem('tree-view') || 'tree';
-  let globeInitialized = false;
+  let externalGlobeController = null;
   const UPCOMING_WINDOW_DAYS = 10;
   const BIRTHDAY_POPUP_WINDOW_DAYS = 7;
-  const GLOBE_CENTER_THRESHOLD = 0.35;
   const GLOBE_REMOTE_THRESHOLD = 0.6;
   const GLOBE_VERTICAL_OFFSET = 34;
   const GLOBE_ROTATION_DEFAULT = -15;
@@ -449,34 +462,76 @@
   const GLOBE_ZOOM_MAX = 2.56;
   const GLOBE_ZOOM_STEP = 0.12;
   const GLOBE_ZOOM_DEFAULT = 0.92;
-  let globeProjection = null;
-  let globePath = null;
-  let globeSvg = null;
-  let globeSpherePath = null;
-  let globeBasePaths = null;
-  let globeHighlightPaths = null;
-  let globeMovedStrokeBluePaths = null;
-  let globeMovedStrokeGoldPaths = null;
-  let globeCountries = [];
-  let globeVisitedFeatures = [];
-  let globeHighlightFeatures = [];
-  let globeRotation = GLOBE_ROTATION_DEFAULT;
-  let globeTilt = GLOBE_TILT_DEFAULT;
-  let globeZoom = GLOBE_ZOOM_DEFAULT;
-  let globePinchStartDistance = null;
-  let globePinchStartZoom = null;
-  let globeDragActive = false;
-  let globeVelocityX = 0;
-  let globeVelocityY = 0;
-  let globeLastDragTime = 0;
-  let globeInertiaId = null;
-  let globeCenterX = 0;
-  let globeCenterY = 0;
-  let globeBaseScale = 0;
-  let globeBaseSize = 0;
-  let globeRenderQueued = false;
-  let globeResizeObserver = null;
-  let globeResetPending = false;
+
+  if (
+    typeof window !== 'undefined' &&
+    window.AncestrioGlobeUI &&
+    typeof window.AncestrioGlobeUI.createGlobeController === 'function'
+  ) {
+    externalGlobeController = window.AncestrioGlobeUI.createGlobeController({
+      globeSvgEl,
+      globeLegendEl,
+      globeTooltip,
+      globeVisits,
+      normalizeCountryName,
+      isActiveView: () => document.body.classList.contains('view-globe'),
+      onUnavailable: () => {
+        if (currentView === 'globe') {
+          setView('tree');
+        }
+      },
+      dataUrl: GLOBE_DATA_URL,
+      remoteThreshold: GLOBE_REMOTE_THRESHOLD,
+      verticalOffset: GLOBE_VERTICAL_OFFSET,
+      rotationDefault: GLOBE_ROTATION_DEFAULT,
+      tiltDefault: GLOBE_TILT_DEFAULT,
+      tiltMin: GLOBE_TILT_MIN,
+      tiltMax: GLOBE_TILT_MAX,
+      tiltSpeed: GLOBE_TILT_SPEED,
+      rotateSpeed: GLOBE_ROTATE_SPEED,
+      zoomMin: GLOBE_ZOOM_MIN,
+      zoomMax: GLOBE_ZOOM_MAX,
+      zoomStep: GLOBE_ZOOM_STEP,
+      zoomDefault: GLOBE_ZOOM_DEFAULT
+    });
+  }
+
+  function resetGlobeView() {
+    if (externalGlobeController && typeof externalGlobeController.resetView === 'function') {
+      externalGlobeController.resetView();
+    }
+  }
+
+  function initGlobe() {
+    if (externalGlobeController && typeof externalGlobeController.init === 'function') {
+      return externalGlobeController.init();
+    }
+    return false;
+  }
+
+  function ensureGlobeVisible(tries = 60) {
+    if (externalGlobeController && typeof externalGlobeController.ensureVisible === 'function') {
+      externalGlobeController.ensureVisible(tries);
+    }
+  }
+
+  function resizeGlobe() {
+    if (externalGlobeController && typeof externalGlobeController.resize === 'function') {
+      externalGlobeController.resize();
+    }
+  }
+
+  function setGlobeZoom(nextZoom) {
+    if (externalGlobeController && typeof externalGlobeController.setZoom === 'function') {
+      externalGlobeController.setZoom(nextZoom);
+    }
+  }
+
+  function adjustGlobeZoom(delta) {
+    if (externalGlobeController && typeof externalGlobeController.adjustZoom === 'function') {
+      externalGlobeController.adjustZoom(delta);
+    }
+  }
 
   function applyViewBodyClasses(view) {
     document.body.classList.remove('view-globe', 'view-calendar', 'view-tree');
@@ -520,7 +575,6 @@
         updateFocusModeUI();
       }
       setCalendarOpen(false);
-      globeResetPending = true;
       resetGlobeView();
       if (!initGlobe()) {
         console.warn('Globe view unavailable, falling back to tree view.');
@@ -736,7 +790,30 @@
   });
 
   // Search functionality
+  const externalSearchController =
+    (typeof window !== 'undefined' &&
+      window.AncestrioSearchUI &&
+      typeof window.AncestrioSearchUI.createSearchController === 'function')
+      ? window.AncestrioSearchUI.createSearchController({
+          searchBar,
+          searchInput,
+          searchResults,
+          personLookup,
+          escapeHtml,
+          openModal,
+          placeholderDataUrl,
+          mobileMediaQuery: '(max-width: 768px)',
+          topbarSelector: '.topbar',
+          noResultsText: 'No results found',
+          birthdayLabel: 'Birthday'
+        })
+      : null;
+
   function toggleSearch(show) {
+    if (externalSearchController && typeof externalSearchController.toggleSearch === 'function') {
+      externalSearchController.toggleSearch(show);
+      return;
+    }
     if (!searchBar) return;
     if (show) {
       positionSearchBar();
@@ -752,6 +829,10 @@
   }
 
   function positionSearchBar() {
+    if (externalSearchController && typeof externalSearchController.positionSearchBar === 'function') {
+      externalSearchController.positionSearchBar();
+      return;
+    }
     if (!searchBar) return;
     const isMobile = window.matchMedia('(max-width: 768px)').matches;
     if (!isMobile) {
@@ -766,6 +847,10 @@
   }
 
   function performSearch(query) {
+    if (externalSearchController && typeof externalSearchController.performSearch === 'function') {
+      externalSearchController.performSearch(query);
+      return;
+    }
     if (!query || !searchResults) return;
     const q = query.toLowerCase().trim();
     const results = [];
@@ -828,9 +913,16 @@
     }
   });
 
-  // Load data from Firebase (if available) or rfamily.json
-  async function loadTreeData() {
-    // Wait for Firebase tree data to be ready (if it's being loaded)
+  // Load data from Firebase (if available) or rfamily.json.
+  // Prefer extracted module to keep main.js focused on rendering/UI.
+  const externalTreeDataLoader =
+    (typeof window !== 'undefined' &&
+      window.AncestrioDataLoader &&
+      typeof window.AncestrioDataLoader.loadTreeData === 'function')
+      ? window.AncestrioDataLoader.loadTreeData
+      : null;
+
+  const loadTreeData = externalTreeDataLoader || (async function loadTreeDataFallback() {
     if (typeof window !== 'undefined' && window.FIREBASE_TREE_READY) {
       console.log('Waiting for Firebase tree data to load...');
       try {
@@ -840,17 +932,32 @@
         console.warn('Firebase tree data loading failed:', err);
       }
     }
-    
-    // Check if Firebase tree data is available (from tree.html)
+
     if (typeof window !== 'undefined' && window.FIREBASE_TREE_DATA) {
       console.log('Loading data from Firebase:', window.FIREBASE_TREE_DATA);
       return Promise.resolve(window.FIREBASE_TREE_DATA);
     }
-    // Otherwise load from rfamily.json (for demo/original tree)
-    console.log('Loading data from local rfamily.json');
-    // Try both relative path (from pages/) and absolute path
-    return loadDataSequential(['../data/rfamily.json', '/data/rfamily.json']);
-  }
+
+    const paths = ['../data/rfamily.json', '/data/rfamily.json'];
+    for (let i = 0; i < paths.length; i += 1) {
+      const url = paths[i];
+      console.log(`Trying to load from: ${url}`);
+      try {
+        const response = await fetch(url);
+        console.log(`Response from ${url}: ${response.status} ${response.statusText}`);
+        if (!response.ok) {
+          throw new Error('HTTP ' + response.status + ' at ' + paths[i]);
+        }
+        const data = await response.json();
+        console.log(`Successfully loaded data from: ${url}`);
+        return data;
+      } catch (err) {
+        console.warn(`Failed to load from ${url}:`, err.message);
+      }
+    }
+
+    throw new Error('No data file found at any path: ' + paths.join(', '));
+  });
   
   loadTreeData()
     .then((data) => {
@@ -882,272 +989,31 @@
         .text('Error: ' + (err.message || 'Failed to load data'));
     });
 
-  function loadDataSequential(paths) {
-    return new Promise((resolve, reject) => {
-      const tryAt = (i) => {
-        if (i >= paths.length) {
-          const err = new Error('No data file found at any path: ' + paths.join(', '));
-          console.error(err.message);
-          return reject(err);
-        }
-        const url = paths[i] + (paths[i].includes('?') ? '' : ('?t=' + Date.now()));
-        console.log(`Trying to load from: ${url}`);
-        fetch(url, { cache: 'no-store' })
-          .then((r) => {
-            console.log(`Response from ${url}: ${r.status} ${r.statusText}`);
-            if (!r.ok) throw new Error('HTTP '+r.status + ' at ' + paths[i]);
-            return r.json();
-          })
-          .then((data) => {
-            console.log(`Successfully loaded data from: ${url}`);
-            resolve(data);
-          })
-          .catch((err) => {
-            console.warn(`Failed to load from ${url}:`, err.message);
-            tryAt(i + 1);
-          });
-      };
-      tryAt(0);
-    });
-  }
+  const externalDataTransform =
+    (typeof window !== 'undefined' && window.AncestrioDataTransform)
+      ? window.AncestrioDataTransform
+      : {};
 
-  function looksLikeRFamilySchema(obj) {
-    return obj && (obj.Parent || obj.Grandparent);
-  }
-
-  function normalizeData(input) {
-    console.log('normalizeData called with:', input);
-    if (looksLikeRFamilySchema(input)) {
-      console.log('Detected rfamily schema');
-      const transformed = transformRFamily(input);
-      console.log('Transformed data:', transformed);
-      const result = attachThumbs(transformed);
-      console.log('After attachThumbs:', result);
-      return result;
-    }
-    console.log('Using data as-is (couple schema)');
-    const result = attachThumbs(input); // already couple-style
-    console.log('After attachThumbs:', result);
-    return result;
-  }
-
-  function toSpouseEntries(rawSpouse) {
-    if (!rawSpouse) return [];
-    const rawList = Array.isArray(rawSpouse) ? rawSpouse : [rawSpouse];
-    const entries = [];
-
-    rawList.forEach((item) => {
-      if (!item) return;
-
-      if (typeof item === 'string') {
-        const name = safe(item).trim();
-        if (!name) return;
-        entries.push({ name, image: '', birthday: '', tags: [], parents: null });
-        return;
-      }
-
-      if (typeof item === 'object') {
-        const name = safe(item.name).trim();
-        const image = safe(item.image).trim();
-        const birthday = safe(item.birthday || item.dob).trim();
-        const tags = readTags(item.tags);
-        const parents = item.parents && typeof item.parents === 'object' ? item.parents : null;
-        const hasData = !!(name || image || birthday || tags.length || parents);
-        if (!hasData) return;
-        entries.push({ name, image, birthday, tags, parents });
-      }
-    });
-
-    return entries;
-  }
-
-  function pickSpouseSides(rawSpouse, legacyPrevSpouse) {
-    const entries = toSpouseEntries(rawSpouse);
-    const right = entries[0] || null;
-    let left = entries[1] || null;
-
-    if (!left && legacyPrevSpouse) {
-      const fallbackName = safe(legacyPrevSpouse.name).trim();
-      const fallbackImage = safe(legacyPrevSpouse.image).trim();
-      const fallbackBirthday = safe(legacyPrevSpouse.birthday || legacyPrevSpouse.dob).trim();
-      const fallbackTags = readTags(legacyPrevSpouse.tags);
-      if (fallbackName || fallbackImage || fallbackBirthday || fallbackTags.length) {
-        left = {
-          name: fallbackName,
-          image: fallbackImage,
-          birthday: fallbackBirthday,
-          tags: fallbackTags,
-          parents: legacyPrevSpouse.parents && typeof legacyPrevSpouse.parents === 'object'
-            ? legacyPrevSpouse.parents
-            : null
-        };
-      }
-    }
-
-    return { right, left, all: entries };
-  }
-
-  function toPrevSpouseField(entry) {
-    if (!entry) return undefined;
-    return {
-      name: safe(entry.name),
-      image: safe(entry.image),
-      birthday: safe(entry.birthday),
-      tags: readTags(entry.tags)
+  const normalizeData = (typeof externalDataTransform.normalizeData === 'function')
+    ? externalDataTransform.normalizeData
+    : function normalizeDataFallback(input) {
+      return input;
     };
-  }
 
-  // Transform rfamily.json into a uniform couple tree (preserving image + gender)
-  function transformRFamily(src) {
-    const rootSpouses = pickSpouseSides(src.spouse, src.prevSpouse);
-    const rootPrimarySpouse = rootSpouses.right;
-    const rootPrevSpouse = rootSpouses.left;
-    const paternal = src.parents ? src.parents : null;
-    const paternalSpouses = paternal ? pickSpouseSides(paternal.spouse, paternal.prevSpouse) : null;
-    const maternal = rootSpouses.all.find((spouse) => spouse && spouse.parents)?.parents || null;
-    const maternalSpouses = maternal ? pickSpouseSides(maternal.spouse, maternal.prevSpouse) : null;
-    const grandparentName = safe(src.Grandparent);
-    const grandparentSpouse = safe(rootPrimarySpouse && rootPrimarySpouse.name);
-    const gpCouple = {
-      name: grandparentName,
-      image: safe(src.image),
-      birthday: safe(src.birthday || src.dob),
-      spouse: grandparentSpouse,
-      spouseImage: safe(rootPrimarySpouse && rootPrimarySpouse.image),
-      spouseBirthday: safe(rootPrimarySpouse && rootPrimarySpouse.birthday),
-      tags: readTags(src.tags),
-      spouseTags: readTags(rootPrimarySpouse && rootPrimarySpouse.tags),
-      children: []
+  const thumbPath = (typeof externalDataTransform.thumbPath === 'function')
+    ? externalDataTransform.thumbPath
+    : function thumbPathFallback(image) {
+      const s = safe(image).trim();
+      if (!s || s.startsWith('data:')) return '';
+      if (s.startsWith('images/thumbs/')) return s;
+      if (s.startsWith('images/')) return `images/thumbs/${s.slice('images/'.length)}`;
+      return s;
     };
-    const normalizedRootPrev = toPrevSpouseField(rootPrevSpouse);
-    if (normalizedRootPrev) {
-      gpCouple.prevSpouse = normalizedRootPrev;
-    }
-    if (paternal && (safe(paternal.name) || (paternalSpouses && (paternalSpouses.right || paternalSpouses.left)))) {
-      gpCouple.parents = {
-        name: safe(paternal.name),
-        image: safe(paternal.image),
-        birthday: safe(paternal.birthday || paternal.dob),
-        spouse: paternalSpouses.right ? safe(paternalSpouses.right.name) : '',
-        spouseImage: paternalSpouses.right ? safe(paternalSpouses.right.image) : '',
-        spouseBirthday: paternalSpouses.right ? safe(paternalSpouses.right.birthday) : '',
-        tags: readTags(paternal.tags),
-        spouseTags: paternalSpouses.right ? readTags(paternalSpouses.right.tags) : []
-      };
-      const paternalPrev = toPrevSpouseField(paternalSpouses.left);
-      if (paternalPrev) gpCouple.parents.prevSpouse = paternalPrev;
-    }
-    if (maternal && (safe(maternal.name) || (maternalSpouses && (maternalSpouses.right || maternalSpouses.left)))) {
-      gpCouple.spouseParents = {
-        name: safe(maternal.name),
-        image: safe(maternal.image),
-        birthday: safe(maternal.birthday || maternal.dob),
-        spouse: maternalSpouses.right ? safe(maternalSpouses.right.name) : '',
-        spouseImage: maternalSpouses.right ? safe(maternalSpouses.right.image) : '',
-        spouseBirthday: maternalSpouses.right ? safe(maternalSpouses.right.birthday) : '',
-        tags: readTags(maternal.tags),
-        spouseTags: maternalSpouses.right ? readTags(maternalSpouses.right.tags) : []
-      };
-      const maternalPrev = toPrevSpouseField(maternalSpouses.left);
-      if (maternalPrev) gpCouple.spouseParents.prevSpouse = maternalPrev;
-    }
 
-    // Parents generation (children of Grandparents)
-    const parents = Array.isArray(src.Parent) ? src.Parent : [];
-    parents.forEach((p) => {
-      const parentSpouses = pickSpouseSides(p.spouse, p.prevSpouse);
-      const rawParentSpouseIndex = Number(p.fromSpouseIndex);
-      const parentFromSpouseIndex = Number.isFinite(rawParentSpouseIndex)
-        ? Math.max(0, Math.trunc(rawParentSpouseIndex))
-        : (p.fromPrevSpouse ? 1 : 0);
-      const pc = {
-        name: safe(p.name),
-        image: safe(p.image),
-        birthday: safe(p.birthday || p.dob),
-        prevSpouse: toPrevSpouseField(parentSpouses.left),
-        spouse: parentSpouses.right ? safe(parentSpouses.right.name) : '',
-        spouseImage: parentSpouses.right ? safe(parentSpouses.right.image) : '',
-        spouseBirthday: parentSpouses.right ? safe(parentSpouses.right.birthday) : '',
-        tags: readTags(p.tags),
-        spouseTags: parentSpouses.right ? readTags(parentSpouses.right.tags) : [],
-        children: [],
-        fromSpouseIndex: parentFromSpouseIndex,
-        fromPrevSpouse: !!p.fromPrevSpouse || parentFromSpouseIndex > 0
-      };
-      gpCouple.children.push(pc);
-
-      // Children generation (children of each Parent)
-      const kids = Array.isArray(p.children)
-        ? p.children
-        : (Array.isArray(p.grandchildren) ? p.grandchildren : []);
-      kids.forEach((k) => {
-        const rawFromSpouseIndex = Number(k.fromSpouseIndex);
-        const fromSpouseIndex = Number.isFinite(rawFromSpouseIndex)
-          ? Math.max(0, Math.trunc(rawFromSpouseIndex))
-          : (k.fromPrevSpouse ? 1 : 0);
-        const childSpouses = pickSpouseSides(k.spouse, k.prevSpouse);
-        const kc = {
-          name: safe(k.name),
-          image: safe(k.image),
-          birthday: safe(k.birthday || k.dob),
-          prevSpouse: toPrevSpouseField(childSpouses.left),
-          spouse: childSpouses.right ? safe(childSpouses.right.name) : '',
-          spouseImage: childSpouses.right ? safe(childSpouses.right.image) : '',
-          spouseBirthday: childSpouses.right ? safe(childSpouses.right.birthday) : '',
-          tags: readTags(k.tags),
-          spouseTags: childSpouses.right ? readTags(childSpouses.right.tags) : [],
-          children: [],
-          fromSpouseIndex,
-          fromPrevSpouse: !!k.fromPrevSpouse || fromSpouseIndex > 0
-        };
-        pc.children.push(kc);
-
-        // Grandchildren (great-grandkids relative to the root)
-        const gk = Array.isArray(k.grandchildren) ? k.grandchildren : [];
-        gk.forEach((gchild) => {
-          kc.children.push({
-            name: safe(gchild.name),
-            image: safe(gchild.image),
-            birthday: safe(gchild.birthday || gchild.dob),
-            tags: readTags(gchild.tags)
-          });
-        });
-      });
-
-      // Support simpler case where Parent lists immediate children as strings.
-      if (Array.isArray(p.childrenStrings)) {
-        p.childrenStrings.forEach((nm) => pc.children.push({ name: safe(nm) }));
-      }
-    });
-
-    return gpCouple;
-  }
-
-  function thumbPath(image) {
-    const s = safe(image).trim();
-    if (!s || s.startsWith('data:')) return '';
-    if (s.startsWith('images/thumbs/')) return s;
-    if (s.startsWith('images/')) return `images/thumbs/${s.slice('images/'.length)}`;
-    return s;
-  }
-
-  function attachThumbsToEntity(entity) {
-    if (!entity) return;
-    entity.thumb = entity.thumb || thumbPath(entity.image);
-    if (entity.spouse || entity.spouseImage) {
-      entity.spouseThumb = entity.spouseThumb || thumbPath(entity.spouseImage);
-    }
-  }
-
-  function attachThumbs(node) {
-    if (!node || typeof node !== 'object') return node;
-    attachThumbsToEntity(node);
-    if (node.prevSpouse) attachThumbsToEntity(node.prevSpouse);
-    if (node.parents) attachThumbsToEntity(node.parents);
-    if (node.spouseParents) attachThumbsToEntity(node.spouseParents);
-    (node.children || []).forEach((child) => attachThumbs(child));
-    return node;
-  }
+  const externalCalendarUtils =
+    (typeof window !== 'undefined' && window.AncestrioCalendarUtils)
+      ? window.AncestrioCalendarUtils
+      : {};
 
   function updateStats(data) {
     if (!statsKidsEl || !statsGrandkidsEl || !statsGreatGrandkidsEl) return;
@@ -1385,11 +1251,17 @@
   }
 
   function formatCount(total) {
+    if (typeof externalCalendarUtils.formatCount === 'function') {
+      return externalCalendarUtils.formatCount(total, t.birthday, t.birthdays);
+    }
     const word = total === 1 ? t.birthday : t.birthdays;
     return `${total} ${word}`;
   }
 
   function shouldExcludeFromCalendar(name) {
+    if (typeof externalCalendarUtils.shouldExcludeFromCalendar === 'function') {
+      return externalCalendarUtils.shouldExcludeFromCalendar(name, calendarExcludeNames);
+    }
     return calendarExcludeNames.has(String(name || '').toLowerCase());
   }
 
@@ -1406,50 +1278,6 @@
     const alias = globeCountryAliases[key];
     return alias || trimmed;
   }
-
-  function isCoarsePointer() {
-    return window.matchMedia && window.matchMedia('(hover: none), (pointer: coarse)').matches;
-  }
-
-  function pruneRemotePolygons(feature, maxDistance = GLOBE_REMOTE_THRESHOLD) {
-    if (!feature || !feature.geometry) return feature;
-    if (feature.geometry.type !== 'MultiPolygon') return feature;
-    const polygons = feature.geometry.coordinates || [];
-    if (polygons.length <= 1) return feature;
-    const polyFeatures = polygons.map((coords) => ({
-      type: 'Feature',
-      properties: feature.properties,
-      geometry: { type: 'Polygon', coordinates: coords }
-    }));
-    let maxIndex = 0;
-    let maxArea = -1;
-    polyFeatures.forEach((poly, idx) => {
-      const area = d3.geoArea(poly);
-      if (area > maxArea) {
-        maxArea = area;
-        maxIndex = idx;
-      }
-    });
-    const main = polyFeatures[maxIndex];
-    const mainCentroid = d3.geoCentroid(main);
-    const kept = polyFeatures.filter((poly, idx) => {
-      if (idx === maxIndex) return true;
-      const distance = d3.geoDistance(mainCentroid, d3.geoCentroid(poly));
-      return distance <= maxDistance;
-    });
-    if (kept.length === 1) {
-      return { ...feature, geometry: kept[0].geometry };
-    }
-    return {
-      ...feature,
-      geometry: {
-        type: 'MultiPolygon',
-        coordinates: kept.map((poly) => poly.geometry.coordinates)
-      }
-    };
-  }
-
-
   // Generic tree traversal helper
   function traverseTree(data, callback) {
     function walk(node) {
@@ -1471,6 +1299,9 @@
   }
 
   function getUpcomingBirthdays(data, windowDays = UPCOMING_WINDOW_DAYS) {
+    if (externalUpcomingController && typeof externalUpcomingController.getUpcomingBirthdays === 'function') {
+      return externalUpcomingController.getUpcomingBirthdays(data, windowDays);
+    }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const msPerDay = 24 * 60 * 60 * 1000;
@@ -1514,6 +1345,10 @@
   }
 
   function renderUpcomingBanner(data) {
+    if (externalUpcomingController && typeof externalUpcomingController.renderUpcomingBanner === 'function') {
+      externalUpcomingController.renderUpcomingBanner(data);
+      return;
+    }
     if (!upcomingContainer) return;
     upcomingBirthdaysList = getUpcomingBirthdays(data);
     upcomingCurrentIndex = 0;
@@ -1528,6 +1363,10 @@
   }
 
   function renderUpcomingBirthdayButton() {
+    if (externalUpcomingController && typeof externalUpcomingController.renderUpcomingBirthdayButton === 'function') {
+      externalUpcomingController.renderUpcomingBirthdayButton();
+      return;
+    }
     if (!upcomingBirthdaysList.length || !upcomingName) return;
     
     const birthday = upcomingBirthdaysList[upcomingCurrentIndex];
@@ -1549,10 +1388,16 @@
   }
 
   function getDaysInMonth(year, monthIdx) {
+    if (typeof externalCalendarUtils.getDaysInMonth === 'function') {
+      return externalCalendarUtils.getDaysInMonth(year, monthIdx);
+    }
     return new Date(year, monthIdx + 1, 0).getDate();
   }
 
   function getFirstDayOffset(year, monthIdx) {
+    if (typeof externalCalendarUtils.getFirstDayOffset === 'function') {
+      return externalCalendarUtils.getFirstDayOffset(year, monthIdx);
+    }
     // JS getDay: 0 Sun, 1 Mon ... -> shift so Monday is 0
     const jsDay = new Date(year, monthIdx, 1).getDay();
     return (jsDay + 6) % 7;
@@ -1592,6 +1437,9 @@
   }
 
   function escapeHtml(str) {
+    if (typeof externalCalendarUtils.escapeHtml === 'function') {
+      return externalCalendarUtils.escapeHtml(str);
+    }
     return String(str)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -1607,393 +1455,6 @@
       applyMobileState && applyMobileState();
       queueCalendarScroll();
     }
-  }
-
-  function getCountryInfo(name) {
-    if (!name) return null;
-    const key = normalizeCountryName(name);
-    return globeVisits[key] || null;
-  }
-
-  function showGlobeTooltip(name, people, x, y, centered = false, lock = false) {
-    if (!globeTooltip) return;
-    const listItems = (people && people.length)
-      ? people.map((p) => `<li class="tooltip-pill">${escapeHtml(p)}</li>`).join('')
-      : '<li class="tooltip-pill">Fara date</li>';
-    globeTooltip.innerHTML = `
-      <div class="tooltip-title">${escapeHtml(name)}</div>
-      <ul class="tooltip-list">${listItems}</ul>
-    `;
-    globeTooltip.hidden = false;
-    globeTooltip.classList.toggle('centered', centered);
-    globeTooltip.classList.add('show');
-    if (centered) {
-      globeTooltip.style.left = '50%';
-      globeTooltip.style.top = '14px';
-    } else {
-      globeTooltip.style.left = `${Math.round(x)}px`;
-      globeTooltip.style.top = `${Math.round(y)}px`;
-    }
-    globeTooltip.dataset.locked = lock ? 'true' : 'false';
-  }
-
-  function hideGlobeTooltip(force = false) {
-    if (!globeTooltip) return;
-    if (!force && globeTooltip.dataset.locked === 'true') return;
-    globeTooltip.classList.remove('show', 'centered');
-    globeTooltip.hidden = true;
-    globeTooltip.dataset.locked = 'false';
-  }
-
-  function normalizeRotation(angle) {
-    const normalized = ((angle + 180) % 360 + 360) % 360 - 180;
-    return normalized;
-  }
-  function clampTilt(value) {
-    return Math.max(GLOBE_TILT_MIN, Math.min(GLOBE_TILT_MAX, value));
-  }
-  function stopGlobeInertia() {
-    if (!globeInertiaId) return;
-    cancelAnimationFrame(globeInertiaId);
-    globeInertiaId = null;
-  }
-
-  function resetGlobeView() {
-    stopGlobeInertia();
-    globeResetPending = true;
-    globeRotation = GLOBE_ROTATION_DEFAULT;
-    globeTilt = GLOBE_TILT_DEFAULT;
-    globeZoom = GLOBE_ZOOM_DEFAULT;
-    globePinchStartDistance = null;
-    globePinchStartZoom = null;
-    globeDragActive = false;
-    globeVelocityX = 0;
-    globeVelocityY = 0;
-    globeLastDragTime = 0;
-    hideGlobeTooltip(true);
-    if (globeProjection) {
-      globeProjection.rotate([globeRotation, globeTilt]);
-      applyGlobeProjection();
-    }
-  }
-
-  function renderGlobe() {
-    if (!globePath || !globeSpherePath) return;
-    globeSpherePath.attr('d', globePath({ type: 'Sphere' }));
-    if (globeBasePaths) globeBasePaths.attr('d', globePath);
-    if (globeHighlightPaths) globeHighlightPaths.attr('d', globePath);
-    if (globeMovedStrokeBluePaths) globeMovedStrokeBluePaths.attr('d', globePath);
-    if (globeMovedStrokeGoldPaths) globeMovedStrokeGoldPaths.attr('d', globePath);
-  }
-
-  function applyGlobeProjection() {
-    if (!globeProjection || !globeBaseScale || !globeBaseSize) return;
-    const radius = globeBaseScale * globeZoom;
-    if (globeLegendEl) {
-      const overflow = Math.max(0, radius - globeBaseSize / 2);
-      const offset = overflow > 0 ? overflow + 12 : 0;
-      globeLegendEl.style.marginTop = '';
-      globeLegendEl.style.transform = offset ? `translateY(${Math.round(offset)}px)` : '';
-    }
-    globeProjection
-      .translate([globeCenterX, globeCenterY])
-      .scale(radius)
-      .rotate([globeRotation, globeTilt]);
-    renderGlobe();
-  }
-
-  function setGlobeZoom(nextZoom) {
-    const clamped = Math.min(GLOBE_ZOOM_MAX, Math.max(GLOBE_ZOOM_MIN, nextZoom));
-    if (Math.abs(clamped - globeZoom) < 0.001) return;
-    globeZoom = clamped;
-    applyGlobeProjection();
-  }
-  function adjustGlobeZoom(delta) {
-    setGlobeZoom(globeZoom + delta);
-  }
-  function handleGlobeWheel(event) {
-    if (!isGlobeActive()) return;
-    event.preventDefault();
-    stopGlobeInertia();
-    const direction = event.deltaY < 0 ? 1 : -1;
-    adjustGlobeZoom(direction * GLOBE_ZOOM_STEP);
-  }
-  function handleGlobeTouchStart(event) {
-    if (!isGlobeActive()) return;
-    if (event.touches && event.touches.length === 2) {
-      stopGlobeInertia();
-      const [a, b] = event.touches;
-      globePinchStartDistance = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-      globePinchStartZoom = globeZoom;
-    }
-  }
-  function handleGlobeTouchMove(event) {
-    if (!isGlobeActive()) return;
-    if (!event.touches || event.touches.length !== 2) return;
-    if (!globePinchStartDistance || globePinchStartZoom == null) return;
-    event.preventDefault();
-    const [a, b] = event.touches;
-    const distance = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-    if (!distance) return;
-    const factor = distance / globePinchStartDistance;
-    setGlobeZoom(globePinchStartZoom * factor);
-  }
-  function handleGlobeTouchEnd(event) {
-    if (event.touches && event.touches.length >= 2) return;
-    globePinchStartDistance = null;
-    globePinchStartZoom = null;
-  }
-
-  function scheduleGlobeRender() {
-    if (globeRenderQueued) return;
-    globeRenderQueued = true;
-    requestAnimationFrame(() => {
-      globeRenderQueued = false;
-      if (!globeProjection) return;
-      globeProjection.rotate([globeRotation, globeTilt]);
-      renderGlobe();
-    });
-  }
-
-  function resizeGlobe() {
-    if (!globeSvgEl || !globeProjection || !globePath) return;
-    const rect = globeSvgEl.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-    const size = Math.min(rect.width, rect.height);
-    globeCenterX = rect.width / 2;
-    globeCenterY = (rect.height / 2) + GLOBE_VERTICAL_OFFSET;
-    globeBaseScale = (size / 2) - 12;
-    globeBaseSize = size;
-    if (globeResetPending) {
-      globeRotation = GLOBE_ROTATION_DEFAULT;
-      globeTilt = GLOBE_TILT_DEFAULT;
-      globeZoom = GLOBE_ZOOM_DEFAULT;
-      globeResetPending = false;
-    }
-    applyGlobeProjection();
-  }
-
-  function ensureGlobeVisible(tries = 60) {
-    if (!globeSvgEl) return;
-    if (!globeProjection) {
-      if (tries <= 0) return;
-      requestAnimationFrame(() => ensureGlobeVisible(tries - 1));
-      return;
-    }
-    const rect = globeSvgEl.getBoundingClientRect();
-    if (rect.width && rect.height) {
-      resizeGlobe();
-      return;
-    }
-    if (tries <= 0) return;
-    requestAnimationFrame(() => ensureGlobeVisible(tries - 1));
-  }
-
-  function initGlobe() {
-    if (!globeSvgEl) return false;
-    if (globeInitialized) return true;
-    if (typeof topojson === 'undefined') {
-      console.warn('TopoJSON client missing, globe view disabled.');
-      return false;
-    }
-    globeInitialized = true;
-    globeSvg = d3.select(globeSvgEl);
-    if (!globeResizeObserver && typeof ResizeObserver !== 'undefined') {
-      globeResizeObserver = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          if (entry.contentRect.width && entry.contentRect.height) {
-            resizeGlobe();
-            break;
-          }
-        }
-      });
-      globeResizeObserver.observe(globeSvgEl);
-    }
-    globeProjection = d3.geoOrthographic()
-      .clipAngle(90)
-      .precision(1.1)
-      .rotate([globeRotation, globeTilt]);
-    globePath = d3.geoPath().projection(globeProjection);
-    globeSpherePath = globeSvg.append('path').attr('class', 'globe-sphere');
-    const countriesGroup = globeSvg.append('g').attr('class', 'globe-countries');
-    const highlightGroup = globeSvg.append('g').attr('class', 'globe-highlights');
-
-    globeSvg.style('cursor', 'grab');
-    if (globeSvgEl && globeSvgEl.setPointerCapture) {
-      globeSvgEl.addEventListener('pointerdown', (event) => {
-        globeSvgEl.setPointerCapture(event.pointerId);
-      });
-      const releasePointer = (event) => {
-        if (globeSvgEl.hasPointerCapture && globeSvgEl.hasPointerCapture(event.pointerId)) {
-          globeSvgEl.releasePointerCapture(event.pointerId);
-        }
-      };
-      globeSvgEl.addEventListener('pointerup', releasePointer);
-      globeSvgEl.addEventListener('pointercancel', releasePointer);
-    }
-    globeSvgEl.addEventListener('wheel', handleGlobeWheel, { passive: false });
-    globeSvgEl.addEventListener('touchstart', handleGlobeTouchStart, { passive: false });
-    globeSvgEl.addEventListener('touchmove', handleGlobeTouchMove, { passive: false });
-    globeSvgEl.addEventListener('touchend', handleGlobeTouchEnd);
-    globeSvgEl.addEventListener('touchcancel', handleGlobeTouchEnd);
-
-    d3.json(GLOBE_DATA_URL).then((world) => {
-      if (!world || !world.objects || !world.objects.countries) {
-        console.warn('Globe data is missing required countries data.');
-        if (currentView === 'globe') setView('tree');
-        return;
-      }
-      globeCountries = topojson.feature(world, world.objects.countries).features || [];
-      const byName = new Map(globeCountries.map((c) => [c.properties.name, c]));
-      globeVisitedFeatures = Object.keys(globeVisits)
-        .map((name) => byName.get(normalizeCountryName(name)))
-        .filter(Boolean);
-      globeHighlightFeatures = globeVisitedFeatures.map((feature) => pruneRemotePolygons(feature));
-      globeVisitedFeatures = globeHighlightFeatures;
-      const movedFeatures = globeHighlightFeatures.filter((feature) => {
-        const info = getCountryInfo(feature.properties.name);
-        return info && info.tone === 'moved';
-      });
-
-      globeBasePaths = countriesGroup.selectAll('path.globe-country-base')
-        .data(globeCountries)
-        .join('path')
-        .attr('class', 'globe-country globe-country-base')
-        .attr('data-name', (d) => d.properties.name);
-
-      globeHighlightPaths = highlightGroup.selectAll('path.globe-country')
-        .data(globeHighlightFeatures)
-        .join('path')
-        .attr('class', (d) => {
-          const info = getCountryInfo(d.properties.name);
-          if (!info) return 'globe-country';
-          if (info.tone === 'home') return 'globe-country home';
-          if (info.tone === 'moved') return 'globe-country moved';
-          return 'globe-country visited';
-        })
-        .attr('data-name', (d) => d.properties.name)
-        .on('mouseenter', (event, d) => {
-          if (isCoarsePointer()) return;
-          const info = getCountryInfo(d.properties.name);
-          if (!info) return;
-          const [x, y] = d3.pointer(event, globeSvgEl);
-          showGlobeTooltip(d.properties.name, info.people, x, y, false, false);
-        })
-        .on('mousemove', (event, d) => {
-          if (isCoarsePointer()) return;
-          const info = getCountryInfo(d.properties.name);
-          if (!info) return;
-          const [x, y] = d3.pointer(event, globeSvgEl);
-          showGlobeTooltip(d.properties.name, info.people, x, y, false, false);
-        })
-        .on('mouseleave', () => {
-          if (isCoarsePointer()) return;
-          hideGlobeTooltip();
-        })
-        .on('click', (event, d) => {
-          const info = getCountryInfo(d.properties.name);
-          if (!info) {
-            hideGlobeTooltip(true);
-            return;
-          }
-          event.stopPropagation();
-          const rect = globeSvgEl.getBoundingClientRect();
-          const lock = isCoarsePointer();
-          showGlobeTooltip(d.properties.name, info.people, rect.width / 2, 16, lock, lock);
-        });
-
-      globeMovedStrokeBluePaths = highlightGroup.selectAll('path.globe-moved-stroke-blue')
-        .data(movedFeatures)
-        .join('path')
-        .attr('class', 'globe-moved-stroke globe-moved-stroke-blue')
-        .attr('data-name', (d) => d.properties.name);
-      globeMovedStrokeGoldPaths = highlightGroup.selectAll('path.globe-moved-stroke-gold')
-        .data(movedFeatures)
-        .join('path')
-        .attr('class', 'globe-moved-stroke globe-moved-stroke-gold')
-        .attr('data-name', (d) => d.properties.name);
-
-      globeSvg.on('click', (event) => {
-        const target = event.target;
-        if (!target || !target.classList) {
-          hideGlobeTooltip(true);
-          return;
-        }
-        if (!target.classList.contains('globe-country')) {
-          hideGlobeTooltip(true);
-          return;
-        }
-        const name = target.getAttribute('data-name');
-        if (!getCountryInfo(name)) hideGlobeTooltip(true);
-      });
-
-      function dragStarted(event) {
-        globeSvg.style('cursor', 'grabbing');
-        hideGlobeTooltip(true);
-        globeDragActive = true;
-        globeVelocityX = 0;
-        globeVelocityY = 0;
-        globeLastDragTime = performance.now();
-        stopGlobeInertia();
-      }
-
-      function dragged(event) {
-        if (!globeDragActive) return;
-        const now = performance.now();
-        const dt = Math.max(12, now - globeLastDragTime);
-        globeLastDragTime = now;
-        const dx = event.dx || 0;
-        const dy = event.dy || 0;
-        globeRotation = normalizeRotation(globeRotation + dx * GLOBE_ROTATE_SPEED);
-        globeTilt = clampTilt(globeTilt - dy * GLOBE_TILT_SPEED);
-        globeVelocityX = (dx * GLOBE_ROTATE_SPEED) / dt;
-        globeVelocityY = (-dy * GLOBE_TILT_SPEED) / dt;
-        scheduleGlobeRender();
-      }
-
-      function dragEnded() {
-        globeSvg.style('cursor', 'grab');
-        globeDragActive = false;
-        startGlobeInertia();
-      }
-
-      function startGlobeInertia() {
-        const minVelocity = 0.0008;
-        if (Math.abs(globeVelocityX) < minVelocity && Math.abs(globeVelocityY) < minVelocity) return;
-        let lastTime = performance.now();
-        const step = () => {
-          const now = performance.now();
-          const dt = Math.max(12, now - lastTime);
-          lastTime = now;
-          const decay = Math.pow(0.92, dt / 16);
-          globeVelocityX *= decay;
-          globeVelocityY *= decay;
-          if (Math.abs(globeVelocityX) < minVelocity && Math.abs(globeVelocityY) < minVelocity) {
-            globeInertiaId = null;
-            return;
-          }
-          globeRotation = normalizeRotation(globeRotation + globeVelocityX * dt);
-          globeTilt = clampTilt(globeTilt + globeVelocityY * dt);
-          scheduleGlobeRender();
-          globeInertiaId = requestAnimationFrame(step);
-        };
-        globeInertiaId = requestAnimationFrame(step);
-      }
-
-      globeSvg.call(
-        d3.drag()
-          .on('start', dragStarted)
-          .on('drag', dragged)
-          .on('end', dragEnded)
-      );
-
-      resizeGlobe();
-      ensureGlobeVisible();
-    }).catch((err) => {
-      console.warn('Failed to load globe data:', err);
-      if (currentView === 'globe') setView('tree');
-    });
-    return true;
   }
 
   function queueCalendarScroll() {
@@ -2047,13 +1508,6 @@
     updateActiveMonthDisplay();
   }
 
-  function ensureActiveMonth() {
-    const cards = Array.from(birthdayMonthsEl ? birthdayMonthsEl.querySelectorAll('.month-card') : []);
-    if (!cards.length) return;
-    const active = cards.find((c) => c.classList.contains('current'));
-    mobileMonthIndex = active ? Number(active.dataset.monthIndex || 0) : (new Date().getMonth() % cards.length);
-  }
-
   function updateActiveMonthDisplay() {
     if (!birthdayMonthsEl || mobileShowAll) return;
     const cards = Array.from(birthdayMonthsEl.querySelectorAll('.month-card'));
@@ -2063,11 +1517,6 @@
     hideBirthdayTooltip();
   }
 
-  function attachSwipe() {
-    if (!birthdayMonthsEl) return;
-    birthdayMonthsEl.addEventListener('touchstart', onTouchStart, { passive: true });
-    birthdayMonthsEl.addEventListener('touchend', onTouchEnd, { passive: true });
-  }
   function detachSwipe() {
     if (!birthdayMonthsEl) return;
     birthdayMonthsEl.removeEventListener('touchstart', onTouchStart);
@@ -2225,6 +1674,10 @@
 
   // Empty state overlay
   function showEmptyStateIfNeeded(data) {
+    if (externalEmptyStateController && typeof externalEmptyStateController.showIfNeeded === 'function') {
+      externalEmptyStateController.showIfNeeded(data);
+      return;
+    }
     const hasVisited = localStorage.getItem('tree-visited');
     if (hasVisited) return;
     if (!data) return;
@@ -2278,679 +1731,173 @@
     }, 10000);
   }
 
-  // Cache for parsed birthdays to avoid repeated parsing
-  const birthdayCache = new Map();
+  const externalMainUtils =
+    (typeof window !== 'undefined' && window.AncestrioMainUtils)
+      ? window.AncestrioMainUtils
+      : {};
 
-  function parseBirthday(raw) {
-    if (!raw) return null;
+  const parseBirthday = (typeof externalMainUtils.parseBirthday === 'function')
+    ? externalMainUtils.parseBirthday
+    : (function () {
+      const birthdayCache = new Map();
+      return function parseBirthdayFallback(raw) {
+        if (!raw) return null;
 
-    // Check cache first
-    const cacheKey = String(raw).trim();
-    if (birthdayCache.has(cacheKey)) {
-      return birthdayCache.get(cacheKey);
-    }
-
-    const str = cacheKey;
-    const ro = str.match(/^(\d{1,2})[.\-/\s](\d{1,2})[.\-/\s](\d{4}|[xX]{4})$/);
-    const iso = !ro && str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    let day, month, year;
-    if (ro) {
-      day = Number(ro[1]);
-      month = Number(ro[2]);
-      year = ro[3].toLowerCase() === 'xxxx' ? 2000 : Number(ro[3]);
-    } else if (iso) {
-      year = Number(iso[1]);
-      month = Number(iso[2]);
-      day = Number(iso[3]);
-    } else {
-      birthdayCache.set(cacheKey, null);
-      return null;
-    }
-    const isLeap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
-    const daysInMonth = [31, isLeap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    if (month < 1 || month > 12) {
-      birthdayCache.set(cacheKey, null);
-      return null;
-    }
-    if (day < 1 || day > daysInMonth[month - 1]) {
-      birthdayCache.set(cacheKey, null);
-      return null;
-    }
-
-    const result = { month, day };
-    birthdayCache.set(cacheKey, result);
-    return result;
-  }
-
-  function safe(v) { return (v == null ? '' : String(v)); }
-  function normalizeName(value) {
-    return String(value || '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-zA-Z0-9]+/g, ' ')
-      .trim()
-      .toLowerCase();
-  }
-  function readTags(value) {
-    if (!value) return [];
-    if (typeof value === 'string') return [value.trim()].filter(Boolean);
-    if (Array.isArray(value)) {
-      return value
-        .map((tag) => (tag == null ? '' : String(tag).trim()))
-        .filter((tag) => tag.length > 0);
-    }
-    if (typeof value === 'object' && value.tag) {
-      return readTags(value.tag);
-    }
-    return [];
-  }
-
-  function asHierarchy(data) {
-    // Treat each entry as a "couple" node with optional spouse
-    return d3.hierarchy(data, (d) => d.children || []);
-  }
-
-  function restructureForOrigin(data) {
-    // Find the origin node (marked with isOrigin: true)
-    function findOrigin(node) {
-      if (node && node.isOrigin) return node;
-      if (node && Array.isArray(node.children)) {
-        for (let child of node.children) {
-          const found = findOrigin(child);
-          if (found) return found;
+        const cacheKey = String(raw).trim();
+        if (birthdayCache.has(cacheKey)) {
+          return birthdayCache.get(cacheKey);
         }
-      }
-      return null;
-    }
 
-    const originNode = findOrigin(data);
-    if (!originNode) return data; // No origin found, return as-is
-
-    // Find parent of origin node
-    function findNodeAndParent(current, target, parent = null) {
-      if (current === target) return { node: current, parent };
-      if (current && Array.isArray(current.children)) {
-        for (let child of current.children) {
-          const result = findNodeAndParent(child, target, current);
-          if (result) return result;
+        const str = cacheKey;
+        const ro = str.match(/^(\d{1,2})[.\-/\s](\d{1,2})[.\-/\s](\d{4}|[xX]{4})$/);
+        const iso = !ro && str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        let day;
+        let month;
+        let year;
+        if (ro) {
+          day = Number(ro[1]);
+          month = Number(ro[2]);
+          year = ro[3].toLowerCase() === 'xxxx' ? 2000 : Number(ro[3]);
+        } else if (iso) {
+          year = Number(iso[1]);
+          month = Number(iso[2]);
+          day = Number(iso[3]);
+        } else {
+          birthdayCache.set(cacheKey, null);
+          return null;
         }
-      }
-      return null;
-    }
 
-    const result = findNodeAndParent(data, originNode);
-    if (!result || !result.parent) return data; // Origin is root, return as-is
+        const isLeap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+        const daysInMonth = [31, isLeap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        if (month < 1 || month > 12) {
+          birthdayCache.set(cacheKey, null);
+          return null;
+        }
+        if (day < 1 || day > daysInMonth[month - 1]) {
+          birthdayCache.set(cacheKey, null);
+          return null;
+        }
 
-    // Extract the origin and restructure
-    const newRoot = {
-      name: originNode.name,
-      image: originNode.image,
-      birthday: originNode.birthday,
-      spouse: originNode.spouse,
-      spouseImage: originNode.spouseImage,
-      spouseBirthday: originNode.spouseBirthday,
-      tags: originNode.tags,
-      spouseTags: originNode.spouseTags,
-      children: originNode.children || []
+        const result = { month, day };
+        birthdayCache.set(cacheKey, result);
+        return result;
+      };
+    })();
+
+  const safe = (typeof externalMainUtils.safe === 'function')
+    ? externalMainUtils.safe
+    : function safeFallback(v) {
+      return v == null ? '' : String(v);
     };
 
-    // Deep clone the parent and remove the origin node from its children
-    const parentCopy = JSON.parse(JSON.stringify(result.parent));
-    if (Array.isArray(parentCopy.children)) {
-      parentCopy.children = parentCopy.children.filter(child => child !== originNode);
-    }
+  const normalizeName = (typeof externalMainUtils.normalizeName === 'function')
+    ? externalMainUtils.normalizeName
+    : function normalizeNameFallback(value) {
+      return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9]+/g, ' ')
+        .trim()
+        .toLowerCase();
+    };
 
-    // Store the parent hierarchy as "parents" property
-    newRoot.parents = parentCopy;
+  const readTags = (typeof externalMainUtils.readTags === 'function')
+    ? externalMainUtils.readTags
+    : function readTagsFallback(value) {
+      if (!value) return [];
+      if (typeof value === 'string') return [value.trim()].filter(Boolean);
+      if (Array.isArray(value)) {
+        return value
+          .map((tag) => (tag == null ? '' : String(tag).trim()))
+          .filter((tag) => tag.length > 0);
+      }
+      if (typeof value === 'object' && value.tag) {
+        return readTagsFallback(value.tag);
+      }
+      return [];
+    };
 
-    return newRoot;
+  if (
+    typeof window !== 'undefined' &&
+    window.AncestrioUpcomingUI &&
+    typeof window.AncestrioUpcomingUI.createUpcomingController === 'function'
+  ) {
+    externalUpcomingController = window.AncestrioUpcomingUI.createUpcomingController({
+      upcomingBtn,
+      upcomingContainer,
+      upcomingName,
+      upcomingPrev,
+      upcomingNext,
+      personLookup,
+      openModal,
+      placeholderDataUrl,
+      parseBirthday,
+      safe,
+      traverseTree,
+      monthsMeta,
+      labels: {
+        today: t.today,
+        tomorrow: t.tomorrow,
+        inDays: t.inDays
+      },
+      defaultWindowDays: UPCOMING_WINDOW_DAYS
+    });
   }
+
+  if (
+    typeof window !== 'undefined' &&
+    window.AncestrioEmptyStateUI &&
+    typeof window.AncestrioEmptyStateUI.createEmptyStateController === 'function'
+  ) {
+    externalEmptyStateController = window.AncestrioEmptyStateUI.createEmptyStateController({
+      getUpcomingBirthdays,
+      parseBirthday,
+      escapeHtml,
+      monthsMeta,
+      labels: {
+        today: t.today,
+        tomorrow: t.tomorrow,
+        inDays: t.inDays
+      },
+      windowDays: BIRTHDAY_POPUP_WINDOW_DAYS,
+      visitedStorageKey: 'tree-visited',
+      document,
+      storage: localStorage
+    });
+  }
+
+  const externalTreeRenderer =
+    (typeof window !== 'undefined' &&
+      window.AncestrioTreeRenderer &&
+      typeof window.AncestrioTreeRenderer.createTreeRenderer === 'function')
+      ? window.AncestrioTreeRenderer.createTreeRenderer({
+          g,
+          defs,
+          person,
+          level,
+          avatar,
+          baseCoupleWidth,
+          safe,
+          readTags,
+          normalizeName,
+          dnaHighlightNames,
+          dnaSuppressNames,
+          thumbPath,
+          placeholderDataUrl,
+          openModal,
+          setDnaGroup: (group) => { dnaGroup = group; },
+          updateDNAVisibility,
+          fitTreeWhenVisible,
+          getTreeDefaultPadding
+        })
+      : null;
 
   function render(data) {
-    g.selectAll('*').remove();
-
-    const getSpouseSortIndex = (nodeData) => {
-      if (!nodeData || typeof nodeData !== 'object') return 0;
-      const rawSpouseIndex = Number(nodeData.fromSpouseIndex);
-      if (Number.isFinite(rawSpouseIndex)) {
-        return Math.max(0, Math.trunc(rawSpouseIndex));
-      }
-      return nodeData.fromPrevSpouse ? 1 : 0;
-    };
-    const sortBySpouseGroup = (nodeData) => {
-      if (!nodeData || typeof nodeData !== 'object' || !Array.isArray(nodeData.children)) return nodeData;
-      nodeData.children = nodeData.children
-        .map((child, index) => ({ child, index }))
-        .sort((a, b) => {
-          const spouseDiff = getSpouseSortIndex(b.child) - getSpouseSortIndex(a.child);
-          if (spouseDiff !== 0) return spouseDiff;
-          return a.index - b.index;
-        })
-        .map((entry) => sortBySpouseGroup(entry.child));
-      return nodeData;
-    };
-
-    // Restructure data so origin node is at root with parents as overlay
-    const restructuredData = sortBySpouseGroup(JSON.parse(JSON.stringify(restructureForOrigin(data))));
-    const root = asHierarchy(restructuredData);
-
-    // Top-to-bottom layout: x = horizontal, y = vertical
-    const tree = d3.tree()
-      .nodeSize([baseCoupleWidth, person.height + level.vGap])
-      .separation((a, b) => {
-        const gap = Math.max(16, person.width * 0.35); // even tighter horizontal spacing
-        const needed = (nodeWidth(a) / 2) + gap + (nodeWidth(b) / 2);
-        const base = needed / baseCoupleWidth;
-        return a.parent === b.parent ? base : base * 1.4; // different families a bit farther
-      });
-
-    tree(root);
-
-    // Connector geometry (split directly below the marriage line for continuity)
-    const splitPad = 18;
-    function layoutFor(data) {
-      const hasLeft = !!(data.prevSpouse && ((data.prevSpouse.name && String(data.prevSpouse.name).trim() !== '') || data.prevSpouse.image));
-      const hasRight = typeof data.spouse === 'string' && data.spouse.trim() !== '';
-      const count = 1 + (hasLeft ? 1 : 0) + (hasRight ? 1 : 0);
-      const totalWidth = person.width * count + person.hGap * (count - 1);
-      const leftStart = -totalWidth / 2;
-      const xPrimary = leftStart + (hasLeft ? (person.width + person.hGap) : 0);
-      const xLeftSpouse = hasLeft ? leftStart : null;
-      const xRightSpouse = hasRight ? (xPrimary + person.width + person.hGap) : null;
-      return { hasLeft, hasRight, count, totalWidth, leftStart, xPrimary, xLeftSpouse, xRightSpouse, left: hasLeft, right: hasRight };
+    if (externalTreeRenderer && typeof externalTreeRenderer.render === 'function') {
+      externalTreeRenderer.render(data);
+      return;
     }
-    function topOfPrimary(node) {
-      const L = layoutFor(node.data);
-      return { x: node.x + L.xPrimary + person.width / 2, y: node.y - person.height / 2 };
-    }
-    function bottomOfPrimary(node) {
-      const L = layoutFor(node.data);
-      return { x: node.x + L.xPrimary + person.width / 2, y: node.y + person.height / 2 };
-    }
-    function bottomOfLeftSpouse(node) {
-      const L = layoutFor(node.data);
-      if (!L.hasLeft) return null;
-      return { x: node.x + L.xLeftSpouse + person.width / 2, y: node.y + person.height / 2 };
-    }
-    function bottomOfRightSpouse(node) {
-      const L = layoutFor(node.data);
-      if (!L.hasRight) return null;
-      return { x: node.x + L.xRightSpouse + person.width / 2, y: node.y + person.height / 2 };
-    }
-    function topOfRightSpouse(node) {
-      const L = layoutFor(node.data);
-      if (!L.hasRight) return null;
-      return { x: node.x + L.xRightSpouse + person.width / 2, y: node.y - person.height / 2 };
-    }
-    function exitFromMarriage(node) { return { x: node.x, y: node.y }; }
-    function marriageLeftPoint(node) {
-      const L = layoutFor(node.data);
-      return { x: node.x + L.xPrimary, y: node.y };
-    }
-    function junctionBelow(node) { return { x: node.x, y: node.y + (person.height / 2) + splitPad }; }
-
-    // How far below the bubbles the two parent-curves meet
-    const mergePad = Math.max(24, person.height * 0.35);
-    const mergeCurves = [];
-    const trunkCommon = [];
-    const marriageNoKids = [];
-    const branches = [];
-    const overlayCouples = [];
-
-    function addOverlayCouple(info, placementAnchor, childAnchor, alignCenter = null, swapPrimarySpouse = false, isDNA = false) {
-      if (!info || !placementAnchor || !childAnchor) return;
-      const data = {
-        name: safe(info.name),
-        image: safe(info.image),
-        birthday: safe(info.birthday),
-        spouse: safe(info.spouse),
-        spouseImage: safe(info.spouseImage),
-        spouseBirthday: safe(info.spouseBirthday),
-        tags: readTags(info.tags),
-        spouseTags: readTags(info.spouseTags || (info.spouse && info.spouse.tags))
-      };
-      if (swapPrimarySpouse) {
-        const tmp = {
-          name: data.name,
-          image: data.image,
-          birthday: data.birthday,
-          tags: data.tags
-        };
-        data.name = data.spouse;
-        data.image = data.spouseImage;
-        data.birthday = data.spouseBirthday;
-        data.tags = data.spouseTags;
-        data.spouse = tmp.name;
-        data.spouseImage = tmp.image;
-        data.spouseBirthday = tmp.birthday;
-        data.spouseTags = tmp.tags;
-      }
-      if (!data.name && !data.spouse) return;
-      const layout = layoutFor(data);
-      let centerX = placementAnchor.x + (person.width / 2);
-      if (alignCenter === 'primary') {
-        const primaryCenter = layout.xPrimary + (person.width / 2);
-        centerX = childAnchor.x - primaryCenter;
-      } else if (alignCenter === 'spouse' && layout.hasRight) {
-        const spouseCenter = layout.xRightSpouse + (person.width / 2);
-        centerX = childAnchor.x - spouseCenter;
-      }
-      const unionX = centerX;
-      const center = {
-        x: centerX,
-        y: placementAnchor.y + (person.height / 2)
-      };
-      const primaryInterior = {
-        x: centerX + layout.xPrimary + person.width,
-        y: center.y
-      };
-      const spouseInterior = layout.hasRight ? {
-        x: centerX + layout.xRightSpouse,
-        y: center.y
-      } : null;
-      const mergeTarget = { x: unionX, y: center.y + mergePad };
-      mergeCurves.push({ source: primaryInterior, target: mergeTarget, isDNA });
-      if (spouseInterior) {
-        mergeCurves.push({ source: spouseInterior, target: mergeTarget, isDNA });
-      }
-      const childPoint = { x: childAnchor.x, y: childAnchor.y };
-      branches.push({ source: mergeTarget, target: childPoint, isDNA });
-      overlayCouples.push({ center, layout, data });
-    }
-    root.descendants().forEach((p) => {
-      const isRoot = p.depth === 0;
-      // place each parent pair centered above its respective child/spouse
-      if (p.data && p.data.spouseParents) {
-        const childAnchor = topOfRightSpouse(p);
-        const placementAnchor = childAnchor ? {
-          x: childAnchor.x - (person.width / 2),
-          y: childAnchor.y - person.height - mergePad
-        } : childAnchor;
-        // Swap so father renders on the right of the mother above Ana
-        // Align mother (after swap) over Ana; father sits to her right
-        addOverlayCouple(p.data.spouseParents, placementAnchor, childAnchor, 'primary', true, false);
-      }
-      if (p.data && p.data.parents) {
-        const childAnchor = topOfPrimary(p);
-        const placementAnchor = {
-          x: childAnchor.x - (person.width / 2),
-          y: childAnchor.y - person.height - mergePad
-        };
-        // Align mother (spouse) over Ioan; father sits to her left
-        addOverlayCouple(p.data.parents, placementAnchor, childAnchor, 'spouse', false, false);
-      }
-      const Lp = layoutFor(p.data || {});
-      const hasChildren = Array.isArray(p.children) && p.children.length > 0;
-      // Start curves at the interior sides (center-right/center-left) of the parent bubbles
-      const yCenter = p.y; // bubble vertical center in absolute coords
-      const yMerge = yCenter + mergePad;
-      const yJ = junctionBelow(p).y;
-      // Interior anchors on the sides facing inward
-      const Lpi = layoutFor(p.data || {});
-      const anchorPrimaryLeft  = { x: p.x + Lpi.xPrimary,              y: yCenter };
-      const anchorPrimaryRight = { x: p.x + Lpi.xPrimary + person.width, y: yCenter };
-      const anchorLeftSpouseRight = Lpi.hasLeft  ? { x: p.x + Lpi.xLeftSpouse  + person.width, y: yCenter } : null;
-      const anchorRightSpouseLeft = Lpi.hasRight ? { x: p.x + Lpi.xRightSpouse,               y: yCenter } : null;
-
-      // Draw horizontal spouse-to-primary lines only for spouse pairs with no children.
-      if (!hasChildren) {
-        if (Lp.hasRight && anchorRightSpouseLeft) {
-          marriageNoKids.push({
-            x0: Math.min(anchorPrimaryRight.x, anchorRightSpouseLeft.x),
-            x1: Math.max(anchorPrimaryRight.x, anchorRightSpouseLeft.x),
-            y: yCenter,
-            isDNA: true
-          });
-        }
-        if (Lp.hasLeft && anchorLeftSpouseRight) {
-          marriageNoKids.push({
-            x0: Math.min(anchorLeftSpouseRight.x, anchorPrimaryLeft.x),
-            x1: Math.max(anchorLeftSpouseRight.x, anchorPrimaryLeft.x),
-            y: yCenter,
-            isDNA: true
-          });
-        }
-        return;
-      }
-
-      let hasLeftChild = false, hasRightChild = false;
-      p.children.forEach((c) => {
-        if (c.data && c.data.fromPrevSpouse) hasLeftChild = true; else hasRightChild = true;
-      });
-
-      if (Lp.hasLeft && !hasLeftChild && anchorLeftSpouseRight) {
-        marriageNoKids.push({
-          x0: Math.min(anchorLeftSpouseRight.x, anchorPrimaryLeft.x),
-          x1: Math.max(anchorLeftSpouseRight.x, anchorPrimaryLeft.x),
-          y: yCenter,
-          isDNA: true
-        });
-      }
-      if (Lp.hasRight && !hasRightChild && anchorRightSpouseLeft) {
-        marriageNoKids.push({
-          x0: Math.min(anchorPrimaryRight.x, anchorRightSpouseLeft.x),
-          x1: Math.max(anchorPrimaryRight.x, anchorRightSpouseLeft.x),
-          y: yCenter,
-          isDNA: true
-        });
-      }
-
-      // Build LEFT union
-      if (Lp.hasLeft && hasLeftChild && anchorLeftSpouseRight) {
-        const xMergeLeft = (anchorLeftSpouseRight.x + anchorPrimaryLeft.x) / 2;
-        const tLeft = { x: xMergeLeft, y: yMerge };
-        mergeCurves.push({ source: anchorLeftSpouseRight, target: tLeft, isDNA: false });
-        mergeCurves.push({ source: anchorPrimaryLeft,     target: tLeft, isDNA: true });
-        trunkCommon.push({ x: xMergeLeft, y0: yMerge, y1: yJ, isDNA: true });
-        const jLeft = { x: xMergeLeft, y: yJ };
-        p.children.forEach((c) => {
-          if (c.data && c.data.fromPrevSpouse) {
-            branches.push({ source: jLeft, target: topOfPrimary(c), parent: p, child: c, isDNA: true });
-          }
-        });
-      }
-      // Build RIGHT union
-      if (Lp.hasRight && hasRightChild && anchorRightSpouseLeft) {
-        const xMergeRight = (anchorPrimaryRight.x + anchorRightSpouseLeft.x) / 2;
-        const tRight = { x: xMergeRight, y: yMerge };
-        mergeCurves.push({ source: anchorPrimaryRight,    target: tRight, isDNA: true });
-        mergeCurves.push({ source: anchorRightSpouseLeft, target: tRight, isDNA: isRoot });
-        trunkCommon.push({ x: xMergeRight, y0: yMerge, y1: yJ, isDNA: true });
-        const jRight = { x: xMergeRight, y: yJ };
-        p.children.forEach((c) => {
-          if (!(c.data && c.data.fromPrevSpouse)) {
-            branches.push({ source: jRight, target: topOfPrimary(c), parent: p, child: c, isDNA: true });
-          }
-        });
-      }
-    });
-    const linkGen = d3.linkVertical().x((d) => d.x).y((d) => d.y);
-    // Custom smoother curve for union connectors (more natural than default)
-    function unionCurvePath(d){
-      const x0 = d.source.x, y0 = d.source.y;
-      const x1 = d.target.x, y1 = d.target.y;
-      const dx = x1 - x0;
-      const dir = dx === 0 ? 0 : (dx > 0 ? 1 : -1);
-      const lead = Math.max(12, Math.min(30, Math.abs(dx) * 0.33)); // shorter horizontal start (previous)
-      const dy = Math.max(30, y1 - y0);
-      const c1x = x0 + dir * lead; // start horizontally
-      const c1y = y0;
-      const c2x = x1;              // arrive smoothly to target
-      const c2y = y1 - dy * 0.6;
-      return `M ${x0},${y0} C ${c1x},${c1y} ${c2x},${c2y} ${x1},${y1}`;
-    }
-    g.append('g')
-      .attr('fill', 'none')
-      .attr('stroke-linecap', 'round')
-      .selectAll('path.curve')
-      .data(mergeCurves)
-      .join('path')
-      .attr('class', 'link')
-      .attr('d', (d) => unionCurvePath(d));
-    g.append('g')
-      .attr('fill', 'none')
-      .attr('stroke-linecap', 'round')
-      .selectAll('path.trunk')
-      .data(trunkCommon)
-      .join('path')
-      .attr('class', 'link trunk')
-      .attr('d', (t) => `M ${t.x},${t.y0} V ${t.y1}`);
-    g.append('g')
-      .attr('fill', 'none')
-      .attr('stroke-linecap', 'round')
-      .selectAll('path.marriage-no-kids')
-      .data(marriageNoKids)
-      .join('path')
-      .attr('class', 'link marriage-no-kids')
-      .attr('d', (t) => `M ${t.x0},${t.y} H ${t.x1}`);
-    g.append('g')
-      .attr('fill', 'none')
-      .attr('stroke-linecap', 'round')
-      .selectAll('path.branch')
-      .data(branches)
-      .join('path')
-      .attr('class', 'link branch')
-      .attr('d', (d) => linkGen(d));
-
-    g.append('g')
-      .attr('display', 'none')
-      .attr('fill', 'none')
-      .attr('stroke-linecap', 'round')
-      .selectAll('path.blood-link')
-      .data(branches)
-      .join('path')
-      .attr('class', 'blood-link')
-      .attr('d', (d) => linkGen(d));
-
-    // Couples
-    const couples = g.append('g')
-      .selectAll('g.couple')
-      .data(root.descendants())
-      .join('g')
-      .attr('class', 'couple')
-      .attr('transform', (d) => `translate(${d.x},${d.y})`);
-
-    couples.each(function (d) {
-      const L = layoutFor(d.data);
-      const group = d3.select(this);
-
-      // marriage connector line(s) removed in favor of curved union lines
-
-      // Primary
-      drawPerson(group, {
-        x: L.xPrimary,
-        y: -person.height / 2,
-        name: d.data.name,
-        meta: '',
-        image: d.data.image,
-        thumb: d.data.thumb,
-        birthday: d.data.birthday,
-        role: 'primary',
-        tags: d.data.tags
-      });
-
-      // Left spouse
-      if (L.hasLeft) {
-        const ps = d.data.prevSpouse || {};
-        drawPerson(group, {
-          x: L.xLeftSpouse,
-          y: -person.height / 2,
-          name: ps.name,
-          meta: '',
-          image: ps.image,
-          thumb: ps.thumb,
-          birthday: ps.birthday,
-          role: 'spouse',
-          tags: ps.tags
-        });
-      }
-
-      // Right spouse
-      if (L.hasRight) {
-        drawPerson(group, {
-          x: L.xRightSpouse,
-          y: -person.height / 2,
-          name: d.data.spouse,
-          meta: '',
-          image: d.data.spouseImage,
-          thumb: d.data.spouseThumb,
-          birthday: d.data.spouseBirthday,
-          role: 'spouse',
-          tags: d.data.spouseTags
-        });
-      }
-    });
-
-    if (overlayCouples.length) {
-      const overlayLayer = g.append('g').attr('class', 'overlay-layer').lower();
-      const overlayGroup = overlayLayer
-        .selectAll('g.couple.overlay')
-        .data(overlayCouples)
-        .join('g')
-        .attr('class', 'couple overlay')
-        .attr('transform', (d) => `translate(${d.center.x},${d.center.y})`);
-
-      overlayGroup.each(function (d) {
-        const group = d3.select(this);
-        const L = d.layout;
-
-        drawPerson(group, {
-          x: L.xPrimary,
-          y: -person.height / 2,
-          name: d.data.name,
-          image: d.data.image,
-          thumb: d.data.thumb,
-          birthday: d.data.birthday,
-          role: 'primary',
-          tags: d.data.tags
-        });
-
-        if (L.hasRight) {
-          drawPerson(group, {
-            x: L.xRightSpouse,
-            y: -person.height / 2,
-            name: d.data.spouse,
-            image: d.data.spouseImage,
-            thumb: d.data.spouseThumb,
-            birthday: d.data.spouseBirthday,
-            role: 'spouse',
-            tags: d.data.spouseTags
-          });
-        }
-      });
-    }
-
-    // DNA overlay group (gold) with toggle â€" show full T via DNA parent only
-    dnaGroup = g.append('g');
-
-    // Curved union segments (gold) only for DNA parent (primary)
-    dnaGroup.selectAll('path.blood-curve')
-      .data(mergeCurves.filter(d => d.isDNA))
-      .join('path')
-      .attr('class', 'blood-link')
-      .attr('d', (d) => unionCurvePath(d));
-
-    // Single vertical trunk (gold)
-    dnaGroup.selectAll('path.blood-trunk')
-      .data(trunkCommon.filter((t) => t.isDNA))
-      .join('path')
-      .attr('class', 'blood-link')
-      .attr('d', (t) => `M ${t.x},${t.y0} V ${t.y1}`);
-
-    dnaGroup.selectAll('path.blood-marriage-no-kids')
-      .data(marriageNoKids.filter((t) => t.isDNA))
-      .join('path')
-      .attr('class', 'blood-link')
-      .attr('d', (t) => `M ${t.x0},${t.y} H ${t.x1}`);
-
-    // Split -> child bubble top (gold curved branches)
-    dnaGroup.selectAll('path.blood-branch')
-      .data(branches.filter((b) => b.isDNA))
-      .join('path')
-      .attr('class', 'blood-link')
-      .attr('d', (d) => linkGen(d));
-    updateDNAVisibility();
-
-    // Fit once right after render, then run a follow-up fit after layout settles.
-    fitTreeWhenVisible(getTreeDefaultPadding(), 60);
-    requestAnimationFrame(() => fitTreeWhenVisible(getTreeDefaultPadding(), 30));
-  }
-
-  function drawPerson(sel, opts) {
-    const tagList = Array.isArray(opts.tags) ? opts.tags : [];
-    const normalizedTags = tagList
-      .map((tag) => (tag == null ? '' : String(tag).trim().toLowerCase()))
-      .filter((tag) => tag.length > 0);
-    const hasVeteranTag = normalizedTags.includes('veteran');
-    const classes = ['person'];
-    if (opts.role) classes.push(opts.role);
-    if (hasVeteranTag) classes.push('tag-veteran');
-    const nameKey = normalizeName(opts.name);
-    if (nameKey && dnaHighlightNames.has(nameKey)) classes.push('dna-highlight');
-    if (nameKey && dnaSuppressNames.has(nameKey)) classes.push('dna-suppress');
-
-    const gPerson = sel.append('g').attr('class', classes.join(' ')).attr('transform', `translate(${opts.x},${opts.y})`);
-
-    gPerson.append('rect')
-      .attr('width', person.width)
-      .attr('height', person.height)
-      .attr('rx', 12).attr('ry', 12);
-
-    if (hasVeteranTag) {
-      const badge = gPerson.append('g')
-        .attr('class', 'badge-veteran')
-        .attr('transform', 'translate(22, 20)')
-        .attr('pointer-events', 'none');
-
-      badge.append('path')
-        .attr('class', 'medal-ribbon')
-        .attr('d', 'M -6 10 L -2 4 L 0 10 L 2 4 L 6 10 L 6 18 L 2 14 L 0 18 L -2 14 L -6 18 Z');
-
-      badge.append('circle')
-        .attr('cx', 0)
-        .attr('cy', 0)
-        .attr('r', 11);
-
-      badge.append('path')
-        .attr('class', 'medal-star')
-        .attr('d', 'M 0,-7 L 2.2,-2.2 L 7,-2.2 L 3.2,0.8 L 4.6,6 L 0,3.2 L -4.6,6 L -3.2,0.8 L -7,-2.2 L -2.2,-2.2 Z');
-    }
-
-    // Avatar (image clipped to a circle) centered above the name
-    const clipId = `clip-${Math.random().toString(36).slice(2, 9)}`;
-    const cp = defs.append('clipPath').attr('id', clipId);
-    cp.append('circle').attr('cx', 0).attr('cy', 0).attr('r', avatar.r);
-
-    const cx = person.width / 2;
-    const cy = avatar.top + avatar.r;
-    const gAvatar = gPerson.append('g').attr('transform', `translate(${cx},${cy})`);
-    const thumbSrc = opts.thumb || thumbPath(opts.image);
-    const fullSrc = opts.image || '';
-    const preferred = thumbSrc || fullSrc || placeholderDataUrl;
-    const imgEl = gAvatar.append('image')
-      .attr('href', preferred)
-      .attr('xlink:href', preferred) // Safari compatibility
-      .attr('x', -avatar.r)
-      .attr('y', -avatar.r)
-      .attr('width', avatar.r * 2)
-      .attr('height', avatar.r * 2)
-      .attr('clip-path', `url(#${clipId})`)
-      .attr('preserveAspectRatio', 'xMidYMid slice')
-      .attr('loading', 'lazy') // Native lazy loading
-      .attr('decoding', 'async'); // Async image decoding
-    // If thumb fails, fall back to full image or placeholder.
-    imgEl.on('error', function () {
-      const fallback = fullSrc || placeholderDataUrl;
-      if (!fallback || this.getAttribute('href') === fallback) return;
-      this.setAttribute('href', fallback);
-      this.setAttributeNS('http://www.w3.org/1999/xlink', 'href', fallback);
-    });
-
-    // Name centered, below the avatar
-    gPerson.append('text')
-      .attr('class', 'name')
-      .attr('x', person.width / 2)
-      .attr('y', avatar.top + avatar.r * 2 + 22)
-      .attr('text-anchor', 'middle')
-      .text(opts.name || '');
-
-    gPerson.on('click', () => {
-      openModal({ name: opts.name, image: opts.image || placeholderDataUrl, birthday: opts.birthday });
-    });
-  }
-
-  function hasSpouseData(d) {
-    const data = d?.data || {};
-    const right = typeof data.spouse === 'string' && data.spouse.trim() !== '';
-    const left = !!(data.prevSpouse && ((data.prevSpouse.name && String(data.prevSpouse.name).trim() !== '') || data.prevSpouse.image));
-    return right || left;
-  }
-  function nodeWidth(d) {
-    const data = d?.data || {};
-    const right = typeof data.spouse === 'string' && data.spouse.trim() !== '';
-    const left = !!(data.prevSpouse && ((data.prevSpouse.name && String(data.prevSpouse.name).trim() !== '') || data.prevSpouse.image));
-    const count = 1 + (right ? 1 : 0) + (left ? 1 : 0);
-    return person.width * count + person.hGap * (count - 1);
+    console.error('Tree renderer module is unavailable.');
   }
 
 })();

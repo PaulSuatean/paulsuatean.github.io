@@ -2,6 +2,10 @@
 
 This repository is a static frontend app for building and viewing family trees, with Firebase for auth and data.
 
+## Cost policy
+
+Do not use Firebase Storage or any service that costs money in this project.
+
 ## Project layout
 
 ```
@@ -12,19 +16,10 @@ This repository is a static frontend app for building and viewing family trees, 
 |- styles/                    # shared and page-specific CSS
 |- images/                    # person photos and static assets
 |- data/                      # local demo data
-|- docs/                      # setup and implementation documentation
 |- firebase.json              # Firebase hosting + Firestore config
 |- firestore.rules            # Firestore security rules
 |- firestore.indexes.json     # Firestore indexes
 ```
-
-## Documentation
-
-- `docs/QUICK_START.md`: fastest setup path
-- `docs/FIREBASE_SETUP.md`: Firebase setup details
-- `docs/LOCAL_TESTING.md`: local emulator/dev flow
-- `docs/WIZARD_SETUP.md`: dashboard wizard notes
-- `docs/IMPLEMENTATION_SUMMARY.md`: architecture and feature summary
 
 ## Single source of truth for Firebase config
 
