@@ -890,6 +890,20 @@ body.theme-dark .add-member-card {
   color: var(--accent);
 }
 
+.add-member-header .modal-close {
+  position: static;
+  margin-left: auto;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  min-height: 38px;
+  padding: 0;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .add-member-body {
   padding: 24px;
 }
@@ -967,6 +981,14 @@ body.theme-dark .add-member-card {
   grid-column: 1 / -1;
 }
 
+#memberBirthdayGroup {
+  width: calc(50% - 6px);
+}
+
+#memberBirthdayGroup .field-input {
+  width: 100%;
+}
+
 .field-label {
   font-size: 13px;
   font-weight: 600;
@@ -1015,12 +1037,35 @@ body.theme-dark .add-member-card {
   flex-direction: column;
   gap: 10px;
   margin-bottom: 10px;
+  min-width: 0;
+}
+
+.countries-section .person-list {
+  margin-bottom: 0;
 }
 
 .person-row {
   display: flex;
   gap: 8px;
   align-items: stretch;
+}
+
+.countries-section .person-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.countries-section .person-row-input {
+  width: 100%;
+  min-width: 0;
+}
+
+.countries-section .country-row-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
 }
 
 .btn-inline {
@@ -1032,17 +1077,33 @@ body.theme-dark .add-member-card {
   white-space: nowrap;
 }
 
+.countries-section .btn-remove-person,
+.countries-section .btn-add-person {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 12px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
 /* Modal Footer */
 .add-member-footer {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  justify-content: flex-end;
   padding: 16px 24px 24px;
   border-top: 1px solid var(--border);
 }
 
 .add-member-footer .btn-primary,
 .add-member-footer .btn-secondary {
+  width: 100%;
+  min-width: 0;
   padding: 12px 24px;
   font-size: 14px;
 }
@@ -1370,12 +1431,22 @@ body.theme-dark .add-member-card {
     grid-template-columns: 1fr;
   }
 
+  #memberBirthdayGroup {
+    width: 100%;
+  }
+
   .person-row {
     flex-direction: column;
   }
 
   .btn-remove-person {
     width: 100%;
+  }
+
+  .countries-section .btn-remove-person,
+  .countries-section .btn-add-person {
+    width: 100%;
+    min-width: 0;
   }
 }
 

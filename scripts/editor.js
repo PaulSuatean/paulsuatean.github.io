@@ -5,6 +5,7 @@ let currentTree = null;
 let treeId = null;
 let hasUnsavedChanges = false;
 let activeSavePromise = null;
+let activeThumbnailEnsurePromise = null;
 let isLocalGuestMode = false;
 let guestPersistTimeout = null;
 let visualState = {
@@ -394,14 +395,10 @@ function areVisitedCountriesEnabledForMemberForm() {
 
 function syncMemberCountriesSectionVisibility() {
   const countriesSection = document.getElementById('memberCountriesSection');
-  const addCountryBtn = document.getElementById('addVisitedCountryBtn');
   const isEnabled = areVisitedCountriesEnabledForMemberForm();
 
   if (countriesSection) {
     window.AncestrioDomDisplay.setDisplay(countriesSection, isEnabled ? 'block' : 'none');
-  }
-  if (addCountryBtn) {
-    addCountryBtn.disabled = !isEnabled;
   }
 
   return isEnabled;
@@ -465,8 +462,28 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Event listeners
   document.getElementById('saveBtn').addEventListener('click', saveTree);
   document.getElementById('viewTreeBtn').addEventListener('click', openPreview);
-  document.getElementById('dashboardBtn')?.addEventListener('click', () => {
-    window.location.href = isLocalGuestMode ? 'dashboard.html?guest=1' : 'dashboard.html';
+  document.getElementById('dashboardBtn')?.addEventListener('click', async () => {
+    const targetHref = isLocalGuestMode ? 'dashboard.html?guest=1' : 'dashboard.html';
+    const dashboardBtn = document.getElementById('dashboardBtn');
+    let reenableTimer = null;
+
+    if (dashboardBtn) {
+      dashboardBtn.disabled = true;
+      reenableTimer = setTimeout(() => {
+        dashboardBtn.disabled = false;
+      }, 2500);
+    }
+
+    try {
+      await ensureTreeThumbnailForDashboard();
+    } catch (error) {
+      console.warn('Proceeding to dashboard without thumbnail update:', error);
+    } finally {
+      if (reenableTimer) clearTimeout(reenableTimer);
+      if (dashboardBtn) dashboardBtn.disabled = false;
+    }
+
+    window.location.href = targetHref;
   });
   
   // Sidebar actions
@@ -593,6 +610,7 @@ async function loadTree() {
     
     hasUnsavedChanges = false;
     updateSaveButton();
+    void ensureTreeThumbnailForDashboard();
   } catch (error) {
     console.error('Error loading tree:', error);
     notifyUser('Failed to load tree. Please try again.', 'error');
@@ -958,6 +976,88 @@ async function generateTreeThumbnail() {
     console.error('Error generating thumbnail:', error);
     return null;
   }
+}
+
+function hasStoredThumbnail(tree) {
+  return Boolean(tree && typeof tree.thumbnailData === 'string' && tree.thumbnailData.trim().length > 0);
+}
+
+function waitForVisualRender(ms = 160) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function ensureTreeThumbnailForDashboard() {
+  if (isLocalGuestMode) return false;
+  if (!treeId || !currentTree) return false;
+  if (hasUnsavedChanges) return false;
+  if (hasStoredThumbnail(currentTree)) return false;
+
+  if (activeSavePromise) {
+    await activeSavePromise;
+    if (hasStoredThumbnail(currentTree)) return true;
+  }
+
+  if (activeThumbnailEnsurePromise) {
+    return activeThumbnailEnsurePromise;
+  }
+
+  activeThumbnailEnsurePromise = (async () => {
+    try {
+      if (!visualState.initialized) {
+        initVisualEditor();
+        await waitForVisualRender(80);
+      }
+
+      if (!visualState.initialized) {
+        return false;
+      }
+
+      renderVisualEditor(true);
+      await waitForVisualRender(180);
+
+      const thumbnailBlob = await generateTreeThumbnail();
+      if (!thumbnailBlob) {
+        return false;
+      }
+
+      const rawThumbnail = await blobToDataUrl(thumbnailBlob);
+      const thumbnailData = await compressImageDataUrl(rawThumbnail, {
+        maxBytes: THUMBNAIL_MAX_BYTES,
+        maxDimension: 800,
+        minDimension: 320,
+        startQuality: 0.84,
+        minQuality: 0.5,
+        qualityStep: 0.06,
+        fillBackground: true
+      });
+
+      if (!thumbnailData) {
+        return false;
+      }
+
+      if (hasUnsavedChanges) {
+        return false;
+      }
+      if (hasStoredThumbnail(currentTree)) {
+        return true;
+      }
+
+      await db.collection('trees').doc(treeId).update({
+        thumbnailData,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      currentTree.thumbnailData = thumbnailData;
+      return true;
+    } catch (error) {
+      console.error('Failed to create missing dashboard thumbnail:', error);
+      return false;
+    } finally {
+      activeThumbnailEnsurePromise = null;
+    }
+  })();
+
+  return activeThumbnailEnsurePromise;
 }
 
 async function saveTree() {
@@ -3405,11 +3505,6 @@ function initAddMemberUI() {
     setInvalidField(event.target, false);
   });
 
-  // Visited countries rows
-  document.getElementById('addVisitedCountryBtn')?.addEventListener('click', () => {
-    addVisitedCountryRow('');
-  });
-
   // Close modal on backdrop click
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
@@ -3554,7 +3649,7 @@ function showEditMemberModal(meta) {
     title.textContent = 'Edit Family Member';
   }
   if (confirmBtn) {
-    confirmBtn.textContent = 'Save Changes';
+    confirmBtn.textContent = 'Save';
   }
   if (titleIcon) {
     titleIcon.textContent = 'edit';
@@ -3720,8 +3815,21 @@ function renderVisitedCountryRows() {
       renderVisitedCountryRows();
     });
 
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'btn-secondary btn-inline btn-add-person';
+    addBtn.textContent = 'Add';
+    addBtn.addEventListener('click', () => {
+      addVisitedCountryRow('');
+    });
+
+    const controls = document.createElement('div');
+    controls.className = 'country-row-controls';
+    controls.appendChild(removeBtn);
+    controls.appendChild(addBtn);
+
     row.appendChild(input);
-    row.appendChild(removeBtn);
+    row.appendChild(controls);
     list.appendChild(row);
   });
 }

@@ -727,14 +727,16 @@ body.theme-dark .btn-danger:hover {
 .wizard-nav-btn {
   min-height: var(--wizard-control-height);
   padding: 0 14px;
+  width: 100%;
+  min-width: 0;
 }
 
 #wizardBackBtn {
-  justify-self: start;
+  justify-self: stretch;
 }
 
 #wizardNextBtn {
-  justify-self: end;
+  justify-self: stretch;
 }
 
 .wizard-progress {

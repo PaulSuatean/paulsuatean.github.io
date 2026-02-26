@@ -134,11 +134,9 @@
           </div>
           
           <div class="support-cta">
-            <a href="https://www.buymeacoffee.com/paulsuatean">
-              <img
-                src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee!&emoji=&slug=paulsuatean&button_colour=FFDD00&font_colour=000000&font_family=Lato&outline_colour=000000&coffee_colour=ffffff"
-                alt="Buy me a coffee button"
-              />
+            <a href="https://www.buymeacoffee.com/paulsuatean" class="coffee-btn" target="_blank" rel="noopener noreferrer">
+              <span class="material-symbols-outlined coffee-btn-icon" aria-hidden="true">local_cafe</span>
+              <span>Support on Buy Me a Coffee</span>
             </a>
           </div>
           
@@ -158,9 +156,11 @@
   <script src="../scripts/theme-toggle.js"></script>
   <script src="../scripts/contact.js"></script>
   <script
+    type="text/plain"
+    data-consent="optional"
     data-name="BMC-Widget"
     data-cfasync="false"
-    src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js"
+    data-src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js"
     data-id="paulsuatean"
     data-description="Support me on Buy me a coffee!"
     data-message=""
@@ -169,5 +169,6 @@
     data-x_margin="18"
     data-y_margin="18"
   ></script>
+  <script src="../scripts/cookie-consent.js"></script>
 </body>
 </html>
