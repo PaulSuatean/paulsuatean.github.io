@@ -1025,17 +1025,66 @@ function renderTreeCard(tree) {
 function countMembers(data) {
   if (!data || typeof data !== 'object') return 0;
   let count = 0;
+  const visited = new WeakSet();
+
+  function hasTextValue(value) {
+    return typeof value === 'string' && value.trim().length > 0;
+  }
+
+  function isPersonLike(node) {
+    if (!node || typeof node !== 'object') return false;
+    return (
+      hasTextValue(node.name) ||
+      hasTextValue(node.Grandparent) ||
+      hasTextValue(node.image) ||
+      hasTextValue(node.birthday) ||
+      hasTextValue(node.dob) ||
+      (Array.isArray(node.tags) && node.tags.length > 0) ||
+      node.isOrigin === true ||
+      !!node.parents ||
+      !!node.spouseParents ||
+      !!node.spouse ||
+      !!node.prevSpouse ||
+      (Array.isArray(node.children) && node.children.length > 0) ||
+      (Array.isArray(node.Parent) && node.Parent.length > 0) ||
+      (Array.isArray(node.grandchildren) && node.grandchildren.length > 0)
+    );
+  }
+
+  function traverseSpouse(rawSpouse) {
+    if (!rawSpouse) return;
+    if (Array.isArray(rawSpouse)) {
+      rawSpouse.forEach((entry) => traverseSpouse(entry));
+      return;
+    }
+
+    if (typeof rawSpouse === 'string') {
+      if (rawSpouse.trim()) count++;
+      return;
+    }
+
+    if (typeof rawSpouse === 'object') {
+      traverse(rawSpouse);
+    }
+  }
 
   function traverse(node) {
-    if (!node) return;
-    count++;
+    if (!node || typeof node !== 'object') return;
+    if (visited.has(node)) return;
+    visited.add(node);
 
-    if (node.spouse) {
-      if (Array.isArray(node.spouse)) {
-        count += node.spouse.length;
-      } else {
-        count++;
-      }
+    if (isPersonLike(node)) {
+      count++;
+    }
+
+    traverseSpouse(node.spouse);
+    traverseSpouse(node.prevSpouse);
+
+    if (node.parents && typeof node.parents === 'object') {
+      traverse(node.parents);
+    }
+    if (node.spouseParents && typeof node.spouseParents === 'object') {
+      traverse(node.spouseParents);
     }
 
     if (Array.isArray(node.children)) {
@@ -1046,6 +1095,11 @@ function countMembers(data) {
     }
     if (Array.isArray(node.grandchildren)) {
       node.grandchildren.forEach((child) => traverse(child));
+    }
+    if (Array.isArray(node.childrenStrings)) {
+      node.childrenStrings.forEach((name) => {
+        if (typeof name === 'string' && name.trim()) count++;
+      });
     }
   }
 
