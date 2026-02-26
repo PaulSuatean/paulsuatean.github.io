@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -26,7 +26,7 @@
     <div class="controls controls-editor">
       <button id="saveBtn" title="Save changes" aria-label="Save changes" disabled>
         <span class="material-symbols-outlined" aria-hidden="true">save</span>
-        Save
+        <span class="save-btn-label">Save</span>
       </button>
       <button id="viewTreeBtn" title="Preview tree" aria-label="Preview tree">
         <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
@@ -43,7 +43,7 @@
     <div class="editor-container">
       <div class="editor-layout">
         <div class="editor-sidebar">
-          <div class="sidebar-section">
+          <div class="sidebar-section tree-settings-section">
             <h3>
               <span class="material-symbols-outlined">settings</span>
               Tree Settings
@@ -56,44 +56,48 @@
               <label class="form-label">Description</label>
               <textarea id="editTreeDescription" class="form-input" rows="3"></textarea>
             </div>
-            <div class="form-group">
-              <label class="form-label">Privacy</label>
-              <select id="editTreePrivacy" class="form-input">
-                <option value="private">Private</option>
-                <option value="public">Public</option>
-              </select>
+            <div class="form-group form-group-setting">
+              <label class="form-label setting-label">Privacy</label>
+              <input type="hidden" id="editTreePrivacy" value="private" />
+              <div class="privacy-radio" role="radiogroup" aria-label="Tree privacy">
+                <input type="radio" id="editTreePrivacyPrivate" name="editTreePrivacyChoice" value="private" checked />
+                <input type="radio" id="editTreePrivacyPublic" name="editTreePrivacyChoice" value="public" />
+                <span class="privacy-radio-slider" aria-hidden="true"></span>
+                <label for="editTreePrivacyPrivate" class="privacy-radio-option privacy-radio-option-private">Private</label>
+                <label for="editTreePrivacyPublic" class="privacy-radio-option privacy-radio-option-public">Public</label>
+              </div>
+            </div>
+            <div class="form-group form-group-setting">
+              <label class="form-label setting-label" for="editCalendarDates">Dates for Calendar</label>
+              <label class="setting-toggle" aria-label="Toggle calendar dates">
+                <input type="checkbox" id="editCalendarDates" checked />
+                <span class="setting-toggle-track" aria-hidden="true"></span>
+                <span class="setting-toggle-state" aria-hidden="true"></span>
+              </label>
+            </div>
+            <div class="form-group form-group-setting">
+              <label class="form-label setting-label" for="editGlobeCountries">Countries for Globe</label>
+              <label class="setting-toggle" aria-label="Toggle globe countries">
+                <input type="checkbox" id="editGlobeCountries" checked />
+                <span class="setting-toggle-track" aria-hidden="true"></span>
+                <span class="setting-toggle-state" aria-hidden="true"></span>
+              </label>
             </div>
           </div>
 
-          <div class="sidebar-section">
-            <h3>
-              <span class="material-symbols-outlined">bolt</span>
-              Quick Actions
-            </h3>
-            <button class="action-btn" id="addPersonBtn">
-              <span class="material-symbols-outlined">person_add</span>
-              Add Family Member
-            </button>
-            <button class="action-btn" id="importJsonBtn">
-              <span class="material-symbols-outlined">upload_file</span>
-              Import JSON
-            </button>
-            <button class="action-btn" id="exportJsonBtn">
-              <span class="material-symbols-outlined">download</span>
-              Export JSON
-            </button>
-          </div>
-
-          <div class="sidebar-section">
+          <div class="sidebar-section instructions-section">
             <h3>
               <span class="material-symbols-outlined">help</span>
               Instructions
             </h3>
             <ul class="instructions-list">
-              <li>Click on any person to edit their details</li>
-              <li>Use the JSON editor below for advanced editing</li>
-              <li>Changes are saved to the cloud</li>
-              <li>Preview your tree before publishing</li>
+              <li>Click a person card to edit name, birthday, photo, and visited countries</li>
+              <li>Click the blue + on a member to add a Parent, Spouse, or Child</li>
+              <li>Click the red delete button on a member to remove them (with confirmation)</li>
+              <li>Use Zoom In, Zoom Out, and Reset to navigate the visual editor</li>
+              <li>Switch to JSON Editor to format and validate tree data</li>
+              <li>Changes are saved to the cloud when you click Save Changes</li>
+              <li>Use Preview to open the current tree view</li>
             </ul>
           </div>
         </div>
@@ -145,6 +149,10 @@
                 <button id="validateJsonBtn" class="tool-btn">
                   <span class="material-symbols-outlined">check_circle</span>
                   Validate
+                </button>
+                <button id="copyJsonBtn" class="tool-btn">
+                  <span class="material-symbols-outlined">content_copy</span>
+                  Copy text
                 </button>
                 <span class="json-status" id="jsonStatus"></span>
               </div>
@@ -246,14 +254,14 @@
               <input type="text" id="memberLastName" class="field-input" placeholder="Doe">
             </div>
           </div>
-          <div class="field-group full-width">
+          <div class="field-group full-width" id="memberBirthdayGroup">
             <label class="field-label">Birthday</label>
             <input type="text" id="memberBirthday" class="field-input" placeholder="30/12/1923">
           </div>
         </div>
 
         <!-- Countries Visited -->
-        <div class="countries-section">
+        <div class="countries-section" id="memberCountriesSection">
           <label class="field-label">Countries Visited</label>
           <div id="visitedCountriesList" class="person-list"></div>
           <button type="button" class="btn-secondary btn-inline" id="addVisitedCountryBtn">Add country</button>
@@ -279,6 +287,18 @@
   <script src="../scripts/dom-display.js"></script>
   <script src="../scripts/firebase-config.js?v=5"></script>
   <script src="../scripts/editor.js?v=3"></script>
+  <script
+    data-name="BMC-Widget"
+    data-cfasync="false"
+    src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js"
+    data-id="paulsuatean"
+    data-description="Support me on Buy me a coffee!"
+    data-message=""
+    data-color="#FFDD00"
+    data-position="Right"
+    data-x_margin="18"
+    data-y_margin="18"
+  ></script>
 </body>
 </html>
 

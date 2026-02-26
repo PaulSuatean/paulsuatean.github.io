@@ -138,6 +138,9 @@ function setupWizardEventListeners() {
       updateWizardPerspective();
     });
   });
+  document.querySelectorAll('input[name="enableGlobeCountries"]').forEach((input) => {
+    input.addEventListener('change', updateWizardPerspective);
+  });
 
   document.getElementById('creatorRelationship').addEventListener('change', updateRelationshipOtherVisibility);
 
@@ -163,6 +166,11 @@ function getWizardCenterMode() {
 
 function areWizardBirthdaysEnabled() {
   const option = document.querySelector('input[name="enableBirthdays"]:checked');
+  return option ? option.value !== 'no' : true;
+}
+
+function areWizardGlobeCountriesEnabled() {
+  const option = document.querySelector('input[name="enableGlobeCountries"]:checked');
   return option ? option.value !== 'no' : true;
 }
 
@@ -1100,6 +1108,8 @@ function resetWizard() {
   document.querySelector('input[name="centerMode"][value="me"]').checked = true;
   const birthdaysYes = document.querySelector('input[name="enableBirthdays"][value="yes"]');
   if (birthdaysYes) birthdaysYes.checked = true;
+  const globeCountriesYes = document.querySelector('input[name="enableGlobeCountries"][value="yes"]');
+  if (globeCountriesYes) globeCountriesYes.checked = true;
   document.getElementById('treeName').value = '';
   document.getElementById('treeDescription').value = '';
   document.querySelector('input[name="privacy"][value="private"]').checked = true;
@@ -1159,6 +1169,7 @@ async function createTreeFromWizard(e) {
   // Step 2: central person
   const centerMode = getWizardCenterMode();
   const birthdaysEnabled = areWizardBirthdaysEnabled();
+  const globeCountriesEnabled = areWizardGlobeCountriesEnabled();
   const centerName = combineNames(
     document.getElementById('centralPersonFirstName').value,
     document.getElementById('centralPersonLastName').value
@@ -1214,6 +1225,7 @@ async function createTreeFromWizard(e) {
       centerPhotoUrl,
       relationshipToCenter,
       enableBirthdays: birthdaysEnabled,
+      enableGlobeCountries: globeCountriesEnabled,
       fatherName,
       fatherBirthdate,
       motherName,
@@ -1229,7 +1241,8 @@ async function createTreeFromWizard(e) {
       centerMode,
       centerName,
       relationshipToCenter: relationshipToCenter || null,
-      enableBirthdays: birthdaysEnabled
+      enableBirthdays: birthdaysEnabled,
+      enableGlobeCountries: globeCountriesEnabled
     };
 
     if (isLocalGuestMode) {
@@ -1237,6 +1250,9 @@ async function createTreeFromWizard(e) {
         name,
         description,
         privacy,
+        enableCalendarDates: birthdaysEnabled,
+        enableBirthdays: birthdaysEnabled,
+        enableGlobeCountries: globeCountriesEnabled,
         data: initialData,
         wizardContext,
         updatedAt: Date.now()
@@ -1252,6 +1268,9 @@ async function createTreeFromWizard(e) {
       name: name,
       description: description,
       privacy: privacy,
+      enableCalendarDates: birthdaysEnabled,
+      enableBirthdays: birthdaysEnabled,
+      enableGlobeCountries: globeCountriesEnabled,
       data: initialData,
       wizardContext,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -1286,6 +1305,7 @@ function buildPersonNode(name, extras = {}) {
 
 function generateFamilyTemplate(options) {
   const birthdaysEnabled = options.enableBirthdays !== false;
+  const globeCountriesEnabled = options.enableGlobeCountries !== false;
   const center = buildPersonNode(options.centerName, {
     image: options.centerPhotoUrl,
     birthdate: birthdaysEnabled ? options.centerBirthdate : ''
@@ -1388,7 +1408,8 @@ function generateFamilyTemplate(options) {
   data.setupContext = {
     centerMode: sanitizeText(options.centerMode) || 'me',
     centerName: center.name,
-    enableBirthdays: birthdaysEnabled
+    enableBirthdays: birthdaysEnabled,
+    enableGlobeCountries: globeCountriesEnabled
   };
 
   const relationshipToCenter = sanitizeText(options.relationshipToCenter);

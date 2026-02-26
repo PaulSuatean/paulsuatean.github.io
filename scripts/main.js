@@ -221,7 +221,7 @@
     usa: 'United States of America'
   };
   const globeMovedCountries = new Set(['Romania', 'United Kingdom', 'Hungary', 'Spain']);
-  const globePeopleVisits = {
+  const demoGlobePeopleVisits = {
     Andreea: ['Egypt', 'Ungaria', 'Italia', 'Bosnia&Herzegovina', 'Portugal', 'Germany', 'USA', 'France'],
     Florin: ['Spania', 'Austria'],
     Ovidiu: ['Italia', 'Spania', 'France', 'Germania', 'Croatia', 'Austria', 'Grecia'],
@@ -238,18 +238,24 @@
     Liviu: ['Ungaria'],
     Victoria: ['Austria', 'Ungaria', 'Grecia']
   };
-  const globeVisits = buildGlobeVisits(globePeopleVisits);
-  function buildGlobeVisits(peopleMap) {
-    const visits = {
-      Romania: { people: ['Familia Suatean'], tone: 'home' }
-    };
+
+  const globeVisits = {};
+  function buildGlobeVisits(peopleMap, options = {}) {
+    const includeDefaultHome = options.includeDefaultHome === true;
+    const useMovedTones = options.useMovedTones === true;
+    const visits = {};
+
+    if (includeDefaultHome) {
+      visits.Romania = { people: ['Familia Suatean'], tone: 'home' };
+    }
+
     Object.entries(peopleMap).forEach(([person, countries]) => {
       if (!Array.isArray(countries)) return;
       countries.forEach((country) => {
         const normalized = normalizeCountryName(country);
         if (!normalized) return;
         const isHome = normalized === 'Romania';
-        const isMoved = globeMovedCountries.has(normalized);
+        const isMoved = useMovedTones && globeMovedCountries.has(normalized);
         const entry = visits[normalized] || { people: [], tone: isHome ? 'home' : (isMoved ? 'moved' : 'visited') };
         if (!entry.people.includes(person)) {
           entry.people.push(person);
@@ -263,6 +269,135 @@
       });
     });
     return visits;
+  }
+
+  function setGlobeVisits(nextVisits) {
+    Object.keys(globeVisits).forEach((country) => delete globeVisits[country]);
+    if (nextVisits && typeof nextVisits === 'object') {
+      Object.entries(nextVisits).forEach(([country, info]) => {
+        const normalizedCountry = normalizeCountryName(country);
+        if (!normalizedCountry || !info || typeof info !== 'object') return;
+        const people = Array.isArray(info.people)
+          ? info.people.map((person) => String(person || '').trim()).filter(Boolean)
+          : [];
+        if (!people.length) return;
+        const tone = info.tone === 'home' || info.tone === 'moved' ? info.tone : 'visited';
+        globeVisits[normalizedCountry] = {
+          people: Array.from(new Set(people)),
+          tone
+        };
+      });
+    }
+
+    if (externalGlobeController && typeof externalGlobeController.setVisits === 'function') {
+      externalGlobeController.setVisits(globeVisits);
+    }
+  }
+
+  function readVisitedCountries(value) {
+    if (Array.isArray(value)) {
+      return value
+        .map((entry) => String(entry || '').trim())
+        .filter(Boolean);
+    }
+    if (typeof value === 'string') {
+      return value
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+    }
+    return [];
+  }
+
+  function collectVisitedByPerson(treeData) {
+    const visitedByPerson = new Map();
+    const seen = new Set();
+
+    const addVisited = (name, visited) => {
+      const personName = String(name || '').trim();
+      if (!personName) return;
+      const countries = readVisitedCountries(visited);
+      if (!countries.length) return;
+      if (!visitedByPerson.has(personName)) {
+        visitedByPerson.set(personName, new Set());
+      }
+      const bucket = visitedByPerson.get(personName);
+      countries.forEach((country) => bucket.add(country));
+    };
+
+    const walk = (node) => {
+      if (!node) return;
+      if (Array.isArray(node)) {
+        node.forEach((entry) => walk(entry));
+        return;
+      }
+      if (typeof node !== 'object') return;
+      if (seen.has(node)) return;
+      seen.add(node);
+
+      if (Object.prototype.hasOwnProperty.call(node, 'Grandparent')) {
+        addVisited(node.Grandparent, node.visited);
+      }
+      if (Object.prototype.hasOwnProperty.call(node, 'name')) {
+        addVisited(node.name, node.visited);
+      }
+
+      if (Object.prototype.hasOwnProperty.call(node, 'spouseVisited') && typeof node.spouse === 'string') {
+        addVisited(node.spouse, node.spouseVisited);
+      }
+
+      const spouseValue = node.spouse;
+      if (Array.isArray(spouseValue)) {
+        spouseValue.forEach((spouseEntry) => {
+          if (spouseEntry && typeof spouseEntry === 'object') {
+            addVisited(spouseEntry.name, spouseEntry.visited);
+          }
+        });
+      } else if (spouseValue && typeof spouseValue === 'object') {
+        addVisited(spouseValue.name, spouseValue.visited);
+      }
+
+      if (node.prevSpouse && typeof node.prevSpouse === 'object') {
+        addVisited(node.prevSpouse.name, node.prevSpouse.visited);
+      }
+
+      Object.values(node).forEach((value) => {
+        if (value && typeof value === 'object') {
+          walk(value);
+        }
+      });
+    };
+
+    walk(treeData);
+    return visitedByPerson;
+  }
+
+  function isDemoTreePage() {
+    if (typeof window === 'undefined' || !window.location) return false;
+    const pathname = String(window.location.pathname || '').toLowerCase();
+    return pathname.endsWith('demo-tree.html');
+  }
+
+  function buildGlobeVisitsFromTreeData(treeData) {
+    const visitedByPerson = collectVisitedByPerson(treeData);
+    const peopleMap = {};
+    visitedByPerson.forEach((countries, person) => {
+      if (!countries || countries.size === 0) return;
+      peopleMap[person] = Array.from(countries);
+    });
+
+    const hasVisitedCountries = Object.keys(peopleMap).length > 0;
+    if (!hasVisitedCountries && isDemoTreePage()) {
+      return buildGlobeVisits(demoGlobePeopleVisits, {
+        includeDefaultHome: true,
+        useMovedTones: true
+      });
+    }
+
+    return buildGlobeVisits(peopleMap, {
+      includeDefaultHome: false,
+      useMovedTones: false
+    });
   }
   const GLOBE_DATA_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
 
@@ -447,6 +582,66 @@
   }
 
   let currentView = localStorage.getItem('tree-view') || 'tree';
+  let calendarViewEnabled = true;
+  let globeViewEnabled = true;
+
+  function parseViewerFeatureFlag(value, fallback = true) {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value !== 0;
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (['1', 'true', 'yes', 'on', 'enabled'].includes(normalized)) return true;
+      if (['0', 'false', 'no', 'off', 'disabled'].includes(normalized)) return false;
+    }
+    return fallback;
+  }
+
+  function resolveViewerSettings(source) {
+    const calendarFlag = (source && Object.prototype.hasOwnProperty.call(source, 'enableCalendarDates'))
+      ? source.enableCalendarDates
+      : source?.enableBirthdays;
+
+    return {
+      enableCalendarDates: parseViewerFeatureFlag(calendarFlag, true),
+      enableGlobeCountries: parseViewerFeatureFlag(source?.enableGlobeCountries, true)
+    };
+  }
+
+  function isViewEnabled(view) {
+    if (view === 'calendar') return calendarViewEnabled;
+    if (view === 'globe') return globeViewEnabled;
+    return true;
+  }
+
+  function setViewToggleVisibility(view, isVisible) {
+    const input = document.getElementById(`view-${view}`);
+    const label = document.querySelector(`label[for="view-${view}"]`);
+    if (input) {
+      input.disabled = !isVisible;
+      input.hidden = !isVisible;
+      if (!isVisible) {
+        input.checked = false;
+      }
+    }
+    if (label) {
+      label.style.display = isVisible ? '' : 'none';
+    }
+  }
+
+  function applyTreeViewSettings(source) {
+    const settings = resolveViewerSettings(source);
+    calendarViewEnabled = settings.enableCalendarDates;
+    globeViewEnabled = settings.enableGlobeCountries;
+    setViewToggleVisibility('calendar', calendarViewEnabled);
+    setViewToggleVisibility('globe', globeViewEnabled);
+    if (viewToggle) {
+      viewToggle.style.display = (calendarViewEnabled || globeViewEnabled) ? '' : 'none';
+    }
+    if (!isViewEnabled(currentView)) {
+      currentView = 'tree';
+    }
+  }
+
   let externalGlobeController = null;
   const UPCOMING_WINDOW_DAYS = 10;
   const BIRTHDAY_POPUP_WINDOW_DAYS = 7;
@@ -556,7 +751,8 @@
 
   function setView(view) {
     const validViews = ['tree', 'calendar', 'globe'];
-    const nextView = validViews.includes(view) ? view : 'tree';
+    const requestedView = validViews.includes(view) ? view : 'tree';
+    const nextView = isViewEnabled(requestedView) ? requestedView : 'tree';
     currentView = nextView;
     applyViewBodyClasses(nextView);
     requestAnimationFrame(updateViewToggleOffset);
@@ -613,6 +809,7 @@
       btn.addEventListener('click', () => setView(btn.dataset.view));
     });
   }
+  applyTreeViewSettings(typeof window !== 'undefined' ? window.FIREBASE_TREE_SETTINGS : null);
   setView(currentView);
 
   function getTreeDefaultPadding() {
@@ -625,6 +822,51 @@
     if (!mobileQuery || !mobileQuery.matches) return 0;
     const base = -Math.min(90, height * 0.18);
     return calendarOpen ? (base - 72) : base;
+  }
+  function isOverlayVisible(element) {
+    if (!element) return false;
+    if (element.hidden) return false;
+    const style = window.getComputedStyle(element);
+    if (!style || style.display === 'none' || style.visibility === 'hidden') return false;
+    const rect = element.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }
+  function getTreeViewportInsets() {
+    const node = svg.node();
+    if (!node) return { top: 0, bottom: 0 };
+    const svgRect = node.getBoundingClientRect();
+    if (!svgRect.width || !svgRect.height) return { top: 0, bottom: 0 };
+
+    const insets = { top: 0, bottom: 0 };
+    const midpointY = svgRect.top + (svgRect.height / 2);
+    const insetGap = 12;
+
+    const addInsetFromOverlay = (element) => {
+      if (!isOverlayVisible(element)) return;
+      const rect = element.getBoundingClientRect();
+      const overlapLeft = Math.max(svgRect.left, rect.left);
+      const overlapRight = Math.min(svgRect.right, rect.right);
+      const overlapTop = Math.max(svgRect.top, rect.top);
+      const overlapBottom = Math.min(svgRect.bottom, rect.bottom);
+
+      if (overlapRight <= overlapLeft || overlapBottom <= overlapTop) return;
+
+      const overlapCenterY = (overlapTop + overlapBottom) / 2;
+      if (overlapCenterY <= midpointY) {
+        insets.top = Math.max(insets.top, overlapBottom - svgRect.top + insetGap);
+      } else {
+        insets.bottom = Math.max(insets.bottom, svgRect.bottom - overlapTop + insetGap);
+      }
+    };
+
+    addInsetFromOverlay(document.querySelector('.app-header .brand-group'));
+    addInsetFromOverlay(document.querySelector('.app-header .controls'));
+    addInsetFromOverlay(viewToggle);
+    if (searchBar && searchBar.classList.contains('show')) {
+      addInsetFromOverlay(searchBar);
+    }
+
+    return insets;
   }
   function fitTreeWhenVisible(padding, tries = 40) {
     const node = svg.node();
@@ -653,9 +895,15 @@
     if (!isFinite(bbox.x) || !isFinite(bbox.y) || !isFinite(bbox.width) || !isFinite(bbox.height)) return;
     const w = svg.node().clientWidth;
     const h = svg.node().clientHeight;
+    const insets = getTreeViewportInsets();
+    const horizontalPadding = padding;
+    const topPadding = padding + insets.top;
+    const bottomPadding = padding + insets.bottom;
+    const safeWidth = Math.max(1, w - horizontalPadding * 2);
+    const safeHeight = Math.max(1, h - topPadding - bottomPadding);
     const scale = Math.min(
-      (w - padding * 2) / Math.max(bbox.width, 1),
-      (h - padding * 2) / Math.max(bbox.height, 1)
+      safeWidth / Math.max(bbox.width, 1),
+      safeHeight / Math.max(bbox.height, 1)
     );
     const safeScale = Math.max(scale, 0.02);
     const initialCap = mobileQuery && mobileQuery.matches
@@ -663,8 +911,10 @@
       : TREE_INITIAL_SCALE_CAP_DESKTOP;
     const appliedScale = Math.min(safeScale, initialCap);
     const maxScale = Math.max(TREE_ZOOM_MAX, safeScale * 5);
-    const tx = (w - bbox.width * appliedScale) / 2 - bbox.x * appliedScale;
-    const ty = (h - bbox.height * appliedScale) / 2 - bbox.y * appliedScale + getTreeVerticalBias(h);
+    const centerX = w / 2;
+    const centerY = topPadding + (safeHeight / 2);
+    const tx = centerX - (bbox.x + (bbox.width / 2)) * appliedScale;
+    const ty = centerY - (bbox.y + (bbox.height / 2)) * appliedScale + getTreeVerticalBias(safeHeight);
     zoom.scaleExtent([TREE_ZOOM_MIN, maxScale]);
     const t = d3.zoomIdentity.translate(tx, ty).scale(appliedScale);
     svg.transition().duration(450).call(zoom.transform, t);
@@ -964,6 +1214,13 @@
       console.log('Data loaded successfully:', data);
       if (!data) {
         throw new Error('Data is null or undefined');
+      }
+
+      setGlobeVisits(buildGlobeVisitsFromTreeData(data));
+
+      if (typeof window !== 'undefined') {
+        applyTreeViewSettings(window.FIREBASE_TREE_SETTINGS || null);
+        setView(currentView);
       }
       familyTreeData = data;
       const normalized = normalizeData(data);

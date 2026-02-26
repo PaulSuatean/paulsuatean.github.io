@@ -9,7 +9,6 @@
     const globeSvgEl = opts.globeSvgEl || null;
     const globeLegendEl = opts.globeLegendEl || null;
     const globeTooltip = opts.globeTooltip || null;
-    const globeVisits = (opts.globeVisits && typeof opts.globeVisits === 'object') ? opts.globeVisits : {};
     const normalizeCountryName =
       typeof opts.normalizeCountryName === 'function'
         ? opts.normalizeCountryName
@@ -66,6 +65,32 @@
     let globeRenderQueued = false;
     let globeResizeObserver = null;
     let globeResetPending = false;
+    let globeHighlightGroup = null;
+    let globeVisits = {};
+
+    function normalizeVisitsMap(rawVisits) {
+      const normalized = {};
+      if (!rawVisits || typeof rawVisits !== 'object') return normalized;
+
+      Object.entries(rawVisits).forEach(([country, info]) => {
+        const countryName = normalizeCountryName(country);
+        if (!countryName || !info || typeof info !== 'object') return;
+        const people = Array.isArray(info.people)
+          ? info.people.map((person) => String(person || '').trim()).filter(Boolean)
+          : [];
+        if (!people.length) return;
+        const toneRaw = String(info.tone || '').trim().toLowerCase();
+        const tone = toneRaw === 'home' || toneRaw === 'moved' ? toneRaw : 'visited';
+        normalized[countryName] = {
+          people: Array.from(new Set(people)),
+          tone
+        };
+      });
+
+      return normalized;
+    }
+
+    globeVisits = normalizeVisitsMap(opts.globeVisits);
 
     function escapeHtml(str) {
       return String(str)
@@ -122,6 +147,80 @@
       if (!name) return null;
       const key = normalizeCountryName(name);
       return globeVisits[key] || null;
+    }
+
+    function refreshHighlightLayers() {
+      if (!globeHighlightGroup || !globeCountries.length) return;
+
+      const byName = new Map(globeCountries.map((country) => [country.properties.name, country]));
+      const globeVisitedFeatures = Object.keys(globeVisits)
+        .map((name) => byName.get(normalizeCountryName(name)))
+        .filter(Boolean);
+      globeHighlightFeatures = globeVisitedFeatures.map((feature) => pruneRemotePolygons(feature));
+      const movedFeatures = globeHighlightFeatures.filter((feature) => {
+        const info = getCountryInfo(feature.properties.name);
+        return info && info.tone === 'moved';
+      });
+
+      globeHighlightPaths = globeHighlightGroup.selectAll('path.globe-country')
+        .data(globeHighlightFeatures)
+        .join('path')
+        .attr('class', (d) => {
+          const info = getCountryInfo(d.properties.name);
+          if (!info) return 'globe-country';
+          if (info.tone === 'home') return 'globe-country home';
+          if (info.tone === 'moved') return 'globe-country moved';
+          return 'globe-country visited';
+        })
+        .attr('data-name', (d) => d.properties.name)
+        .on('mouseenter', (event, d) => {
+          if (isCoarsePointer()) return;
+          const info = getCountryInfo(d.properties.name);
+          if (!info) return;
+          const pointer = d3.pointer(event, globeSvgEl);
+          showGlobeTooltip(d.properties.name, info.people, pointer[0], pointer[1], false, false);
+        })
+        .on('mousemove', (event, d) => {
+          if (isCoarsePointer()) return;
+          const info = getCountryInfo(d.properties.name);
+          if (!info) return;
+          const pointer = d3.pointer(event, globeSvgEl);
+          showGlobeTooltip(d.properties.name, info.people, pointer[0], pointer[1], false, false);
+        })
+        .on('mouseleave', () => {
+          if (isCoarsePointer()) return;
+          hideGlobeTooltip();
+        })
+        .on('click', (event, d) => {
+          const info = getCountryInfo(d.properties.name);
+          if (!info) {
+            hideGlobeTooltip(true);
+            return;
+          }
+          event.stopPropagation();
+          const rect = globeSvgEl.getBoundingClientRect();
+          const lock = isCoarsePointer();
+          showGlobeTooltip(d.properties.name, info.people, rect.width / 2, 16, lock, lock);
+        });
+
+      globeMovedStrokeBluePaths = globeHighlightGroup.selectAll('path.globe-moved-stroke-blue')
+        .data(movedFeatures)
+        .join('path')
+        .attr('class', 'globe-moved-stroke globe-moved-stroke-blue')
+        .attr('data-name', (d) => d.properties.name);
+
+      globeMovedStrokeGoldPaths = globeHighlightGroup.selectAll('path.globe-moved-stroke-gold')
+        .data(movedFeatures)
+        .join('path')
+        .attr('class', 'globe-moved-stroke globe-moved-stroke-gold')
+        .attr('data-name', (d) => d.properties.name);
+
+      renderGlobe();
+    }
+
+    function setVisits(nextVisits) {
+      globeVisits = normalizeVisitsMap(nextVisits);
+      refreshHighlightLayers();
     }
 
     function showGlobeTooltip(name, people, x, y, centered = false, lock = false) {
@@ -336,7 +435,7 @@
       globePath = d3.geoPath().projection(globeProjection);
       globeSpherePath = globeSvg.append('path').attr('class', 'globe-sphere');
       const countriesGroup = globeSvg.append('g').attr('class', 'globe-countries');
-      const highlightGroup = globeSvg.append('g').attr('class', 'globe-highlights');
+      globeHighlightGroup = globeSvg.append('g').attr('class', 'globe-highlights');
 
       globeSvg.style('cursor', 'grab');
       if (globeSvgEl.setPointerCapture) {
@@ -365,15 +464,6 @@
         }
 
         globeCountries = topojson.feature(world, world.objects.countries).features || [];
-        const byName = new Map(globeCountries.map((country) => [country.properties.name, country]));
-        const globeVisitedFeatures = Object.keys(globeVisits)
-          .map((name) => byName.get(normalizeCountryName(name)))
-          .filter(Boolean);
-        globeHighlightFeatures = globeVisitedFeatures.map((feature) => pruneRemotePolygons(feature));
-        const movedFeatures = globeHighlightFeatures.filter((feature) => {
-          const info = getCountryInfo(feature.properties.name);
-          return info && info.tone === 'moved';
-        });
 
         globeBasePaths = countriesGroup.selectAll('path.globe-country-base')
           .data(globeCountries)
@@ -381,58 +471,7 @@
           .attr('class', 'globe-country globe-country-base')
           .attr('data-name', (d) => d.properties.name);
 
-        globeHighlightPaths = highlightGroup.selectAll('path.globe-country')
-          .data(globeHighlightFeatures)
-          .join('path')
-          .attr('class', (d) => {
-            const info = getCountryInfo(d.properties.name);
-            if (!info) return 'globe-country';
-            if (info.tone === 'home') return 'globe-country home';
-            if (info.tone === 'moved') return 'globe-country moved';
-            return 'globe-country visited';
-          })
-          .attr('data-name', (d) => d.properties.name)
-          .on('mouseenter', (event, d) => {
-            if (isCoarsePointer()) return;
-            const info = getCountryInfo(d.properties.name);
-            if (!info) return;
-            const pointer = d3.pointer(event, globeSvgEl);
-            showGlobeTooltip(d.properties.name, info.people, pointer[0], pointer[1], false, false);
-          })
-          .on('mousemove', (event, d) => {
-            if (isCoarsePointer()) return;
-            const info = getCountryInfo(d.properties.name);
-            if (!info) return;
-            const pointer = d3.pointer(event, globeSvgEl);
-            showGlobeTooltip(d.properties.name, info.people, pointer[0], pointer[1], false, false);
-          })
-          .on('mouseleave', () => {
-            if (isCoarsePointer()) return;
-            hideGlobeTooltip();
-          })
-          .on('click', (event, d) => {
-            const info = getCountryInfo(d.properties.name);
-            if (!info) {
-              hideGlobeTooltip(true);
-              return;
-            }
-            event.stopPropagation();
-            const rect = globeSvgEl.getBoundingClientRect();
-            const lock = isCoarsePointer();
-            showGlobeTooltip(d.properties.name, info.people, rect.width / 2, 16, lock, lock);
-          });
-
-        globeMovedStrokeBluePaths = highlightGroup.selectAll('path.globe-moved-stroke-blue')
-          .data(movedFeatures)
-          .join('path')
-          .attr('class', 'globe-moved-stroke globe-moved-stroke-blue')
-          .attr('data-name', (d) => d.properties.name);
-
-        globeMovedStrokeGoldPaths = highlightGroup.selectAll('path.globe-moved-stroke-gold')
-          .data(movedFeatures)
-          .join('path')
-          .attr('class', 'globe-moved-stroke globe-moved-stroke-gold')
-          .attr('data-name', (d) => d.properties.name);
+        refreshHighlightLayers();
 
         globeSvg.on('click', (event) => {
           const target = event.target;
@@ -524,7 +563,8 @@
       resize,
       resetView,
       setZoom,
-      adjustZoom
+      adjustZoom,
+      setVisits
     };
   }
 

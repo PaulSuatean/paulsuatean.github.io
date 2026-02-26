@@ -1,6 +1,30 @@
 window.FIREBASE_TREE_DATA = null;
 window.FIREBASE_TREE_NAME = null;
+window.FIREBASE_TREE_SETTINGS = null;
 window.IS_LOCAL_PREVIEW = false;
+
+function parseTreeFeatureFlag(value, fallback = true) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['1', 'true', 'yes', 'on', 'enabled'].includes(normalized)) return true;
+    if (['0', 'false', 'no', 'off', 'disabled'].includes(normalized)) return false;
+  }
+  return fallback;
+}
+
+function resolveTreeViewerSettings(source) {
+  const calendarFlag = (source && Object.prototype.hasOwnProperty.call(source, 'enableCalendarDates'))
+    ? source.enableCalendarDates
+    : source?.enableBirthdays;
+
+  return {
+    enableCalendarDates: parseTreeFeatureFlag(calendarFlag, true),
+    enableGlobeCountries: parseTreeFeatureFlag(source?.enableGlobeCountries, true)
+  };
+}
+
 window.FIREBASE_TREE_READY = (async function () {
   const urlParams = new URLSearchParams(window.location.search);
   const treeId = urlParams.get('id');
@@ -20,6 +44,7 @@ window.FIREBASE_TREE_READY = (async function () {
         if (previewData && isFresh) {
           window.FIREBASE_TREE_DATA = previewData;
           window.FIREBASE_TREE_NAME = previewName;
+          window.FIREBASE_TREE_SETTINGS = resolveTreeViewerSettings(preview);
           window.IS_LOCAL_PREVIEW = true;
           document.getElementById('treeName').textContent = previewName;
           console.log('Loaded tree data from local preview draft');
@@ -99,6 +124,7 @@ window.FIREBASE_TREE_READY = (async function () {
 
     window.FIREBASE_TREE_DATA = tree.data;
     window.FIREBASE_TREE_NAME = tree.name;
+    window.FIREBASE_TREE_SETTINGS = resolveTreeViewerSettings(tree);
     document.getElementById('treeName').textContent = tree.name;
     console.log('Firebase tree data loaded successfully');
   } catch (error) {
@@ -109,19 +135,25 @@ window.FIREBASE_TREE_READY = (async function () {
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('backBtn')?.addEventListener('click', () => {
-    if (window.IS_LOCAL_PREVIEW) {
-      window.location.href = 'dashboard.html';
+  document.getElementById('backBtn')?.addEventListener('click', (event) => {
+    event.preventDefault();
+
+    if (window.history.length > 1) {
+      window.history.back();
       return;
     }
 
-    // Guard when preview loaded without Firebase init.
+    // Fallback when there is no browser history entry.
+    if (window.IS_LOCAL_PREVIEW) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const fallbackTreeId = urlParams.get('id');
+      window.location.href = fallbackTreeId ? `editor.html?id=${encodeURIComponent(fallbackTreeId)}` : 'editor.html';
+      return;
+    }
+
+    // Guard when page is loaded without an initialized Firebase app.
     const hasFirebaseApp = typeof firebase !== 'undefined' && Array.isArray(firebase.apps) && firebase.apps.length > 0;
     const loggedIn = hasFirebaseApp && firebase.auth().currentUser;
-    if (loggedIn) {
-      window.location.href = 'dashboard.html';
-    } else {
-      window.location.href = 'auth.html';
-    }
+    window.location.href = loggedIn ? 'dashboard.html' : 'auth.html';
   });
 });

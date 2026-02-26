@@ -91,6 +91,19 @@
       const result = findNodeAndParent(data, originNode);
       if (!result || !result.parent) return data;
 
+      // Re-rooting relies on parent overlays in the viewer. That path does not
+      // render siblings or ancestor branches under the parent node, so keep the
+      // original root whenever those relatives exist.
+      const parentChildren = Array.isArray(result.parent.children) ? result.parent.children : [];
+      const hasSiblingBranches = parentChildren.some((child) => child && child !== originNode);
+      const hasAncestorBranches = !!(
+        result.parent &&
+        (result.parent.parents || result.parent.spouseParents)
+      );
+      if (hasSiblingBranches || hasAncestorBranches) {
+        return data;
+      }
+
       const newRoot = JSON.parse(JSON.stringify(originNode));
       if (!Array.isArray(newRoot.children)) {
         newRoot.children = [];
@@ -231,9 +244,10 @@
 
       const restructuredData = sortBySpouseGroup(JSON.parse(JSON.stringify(restructureForOrigin(data))));
       const root = asHierarchy(restructuredData);
+      const generationStepY = person.height + level.vGap;
 
       const tree = d3.tree()
-        .nodeSize([baseCoupleWidth, person.height + level.vGap])
+        .nodeSize([baseCoupleWidth, generationStepY])
         .separation((a, b) => {
           const gap = Math.max(16, person.width * 0.35);
           const needed = (nodeWidth(a) / 2) + gap + (nodeWidth(b) / 2);
@@ -277,6 +291,14 @@
       const marriageNoKids = [];
       const branches = [];
       const overlayCouples = [];
+      function ancestorPlacementFromChildAnchor(childAnchor) {
+        if (!childAnchor) return null;
+        return {
+          x: childAnchor.x - (person.width / 2),
+          // Keep ancestor overlays on the same generation grid as tree nodes.
+          y: childAnchor.y - generationStepY
+        };
+      }
 
       function addOverlayCouple(info, placementAnchor, childAnchor, alignCenter, swapPrimarySpouse, isDNA) {
         if (!info || !placementAnchor || !childAnchor) return;
@@ -335,18 +357,12 @@
 
         if (parentNode.data && parentNode.data.spouseParents) {
           const childAnchor = topOfRightSpouse(parentNode);
-          const placementAnchor = childAnchor ? {
-            x: childAnchor.x - (person.width / 2),
-            y: childAnchor.y - person.height - mergePad
-          } : childAnchor;
+          const placementAnchor = ancestorPlacementFromChildAnchor(childAnchor);
           addOverlayCouple(parentNode.data.spouseParents, placementAnchor, childAnchor, 'primary', true, false);
         }
         if (parentNode.data && parentNode.data.parents) {
           const childAnchor = topOfPrimary(parentNode);
-          const placementAnchor = {
-            x: childAnchor.x - (person.width / 2),
-            y: childAnchor.y - person.height - mergePad
-          };
+          const placementAnchor = ancestorPlacementFromChildAnchor(childAnchor);
           addOverlayCouple(parentNode.data.parents, placementAnchor, childAnchor, 'spouse', false, false);
         }
 

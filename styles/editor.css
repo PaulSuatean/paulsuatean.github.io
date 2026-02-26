@@ -13,12 +13,101 @@
   z-index: 1;
 }
 
+@media (min-width: 1025px) {
+  body.editor-page {
+    overflow: hidden;
+  }
+
+  body.editor-page .editor-main {
+    --editor-header-height: calc(var(--header-corner-top, 24px) + var(--header-corner-size, 48px) + 8px);
+    height: calc(100vh - var(--editor-header-height));
+    min-height: 0;
+    padding: 16px 0;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  body.editor-page .editor-container,
+  body.editor-page .editor-layout,
+  body.editor-page .editor-sidebar,
+  body.editor-page .editor-content {
+    min-height: 0;
+  }
+
+  body.editor-page .editor-container {
+    max-width: none;
+    width: 100%;
+    padding: 0 clamp(12px, 2vw, 28px);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  body.editor-page .editor-layout {
+    width: 100%;
+    max-width: none;
+    grid-template-columns: minmax(270px, 300px) minmax(0, 1fr);
+    flex: 1;
+    align-items: stretch;
+  }
+
+  body.editor-page .editor-sidebar,
+  body.editor-page .editor-content {
+    height: 100%;
+  }
+
+  body.editor-page .editor-sidebar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  body.editor-page .editor-sidebar .sidebar-section {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  body.editor-page .tree-settings-section,
+  body.editor-page .instructions-section {
+    scrollbar-gutter: stable;
+    overflow: auto;
+  }
+
+  body.editor-page .instructions-section .instructions-list {
+    overflow: visible;
+  }
+}
+
 .dashboard-link {
   text-decoration: none;
 }
 
 body.theme-dark .editor-main {
   background: #0b1d33;
+}
+
+body.editor-page {
+  --editor-scrollbar-size: 10px;
+  --editor-scrollbar-track: rgba(37, 65, 102, 0.28);
+  --editor-scrollbar-thumb: rgba(96, 165, 250, 0.5);
+  --editor-scrollbar-thumb-hover: rgba(125, 189, 255, 0.72);
+  --editor-header-action-width: 140px;
+}
+
+body.editor-page:not(.focus-mode) .app-header .controls.controls-editor > button,
+body.editor-page:not(.focus-mode) .app-header .controls.controls-editor > a > button {
+  justify-content: center;
+}
+
+@media (min-width: 769px) {
+  body.editor-page:not(.focus-mode) .app-header .controls.controls-editor > button,
+  body.editor-page:not(.focus-mode) .app-header .controls.controls-editor > a > button {
+    width: var(--editor-header-action-width);
+    min-width: var(--editor-header-action-width);
+  }
 }
 
 .editor-layout {
@@ -71,6 +160,165 @@ body.theme-dark .editor-main {
 
 select.form-input {
   cursor: pointer;
+}
+
+.form-group-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  margin-bottom: 0;
+}
+
+.form-group-setting + .form-group-setting {
+  border-top: 1px solid var(--border);
+}
+
+.form-group-setting .setting-label {
+  margin: 0;
+  padding: 0;
+  flex: 1;
+}
+
+.setting-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.setting-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.setting-toggle-track {
+  width: 62px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  position: relative;
+  transition: background var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.setting-toggle-track::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-base), background var(--transition-base);
+}
+
+.setting-toggle-state {
+  min-width: 30px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+  transition: color var(--transition-base);
+}
+
+.setting-toggle input:focus-visible + .setting-toggle-track {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.setting-toggle input:checked + .setting-toggle-track {
+  border-color: var(--accent);
+  background: rgba(59, 130, 246, 0.14);
+}
+
+.setting-toggle input:checked + .setting-toggle-track::before {
+  transform: translateX(28px);
+  background: var(--accent);
+}
+
+.setting-toggle input:checked ~ .setting-toggle-state {
+  color: var(--accent);
+}
+
+.setting-toggle input:checked ~ .setting-toggle-state::before {
+  content: 'On';
+}
+
+.setting-toggle input:not(:checked) ~ .setting-toggle-state::before {
+  content: 'Off';
+}
+
+.privacy-radio {
+  --privacy-radio-height: 38px;
+  --privacy-radio-padding: 3px;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  width: 172px;
+  height: var(--privacy-radio-height);
+  padding: var(--privacy-radio-padding);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.privacy-radio input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.privacy-radio-slider {
+  position: absolute;
+  top: var(--privacy-radio-padding);
+  left: var(--privacy-radio-padding);
+  width: calc(50% - var(--privacy-radio-padding));
+  height: calc(100% - (var(--privacy-radio-padding) * 2));
+  border-radius: calc(var(--radius-md) - 3px);
+  background: var(--accent);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-base);
+  z-index: 1;
+}
+
+.privacy-radio-option {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+  user-select: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  transition: color var(--transition-base);
+}
+
+#editTreePrivacyPrivate:checked ~ .privacy-radio-slider {
+  transform: translateX(0);
+}
+
+#editTreePrivacyPublic:checked ~ .privacy-radio-slider {
+  transform: translateX(100%);
+}
+
+#editTreePrivacyPrivate:checked ~ .privacy-radio-option-private,
+#editTreePrivacyPublic:checked ~ .privacy-radio-option-public {
+  color: #ffffff;
 }
 
 .sidebar-section {
@@ -139,6 +387,52 @@ body.theme-dark .sidebar-section {
   color: var(--muted);
   font-size: 14px;
   line-height: 1.8;
+}
+
+.tree-settings-section,
+.instructions-section,
+.json-editor,
+.add-member-card,
+.modal-dialog {
+  scrollbar-width: thin;
+  scrollbar-color: var(--editor-scrollbar-thumb) var(--editor-scrollbar-track);
+}
+
+.tree-settings-section::-webkit-scrollbar,
+.instructions-section::-webkit-scrollbar,
+.json-editor::-webkit-scrollbar,
+.add-member-card::-webkit-scrollbar,
+.modal-dialog::-webkit-scrollbar {
+  width: var(--editor-scrollbar-size);
+  height: var(--editor-scrollbar-size);
+}
+
+.tree-settings-section::-webkit-scrollbar-track,
+.instructions-section::-webkit-scrollbar-track,
+.json-editor::-webkit-scrollbar-track,
+.add-member-card::-webkit-scrollbar-track,
+.modal-dialog::-webkit-scrollbar-track {
+  background: var(--editor-scrollbar-track);
+  border-radius: 999px;
+}
+
+.tree-settings-section::-webkit-scrollbar-thumb,
+.instructions-section::-webkit-scrollbar-thumb,
+.json-editor::-webkit-scrollbar-thumb,
+.add-member-card::-webkit-scrollbar-thumb,
+.modal-dialog::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--editor-scrollbar-thumb), rgba(59, 130, 246, 0.46));
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.tree-settings-section::-webkit-scrollbar-thumb:hover,
+.instructions-section::-webkit-scrollbar-thumb:hover,
+.json-editor::-webkit-scrollbar-thumb:hover,
+.add-member-card::-webkit-scrollbar-thumb:hover,
+.modal-dialog::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--editor-scrollbar-thumb-hover), rgba(59, 130, 246, 0.7));
 }
 
 .guest-mode-notice {
@@ -214,16 +508,19 @@ body.theme-dark .editor-tabs {
 .tab-content {
   display: none;
   flex: 1;
-  min-height: 600px;
+  min-height: 0;
   position: relative;
   z-index: 2;
 }
 
 .tab-content.active {
-  display: block;
+  display: flex;
+  flex-direction: column;
 }
 
 .visual-editor {
+  flex: 1;
+  min-height: 0;
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -319,6 +616,18 @@ body.theme-dark .visual-toolbar {
   z-index: 2;
 }
 
+@media (min-width: 1025px) {
+  .visual-canvas {
+    flex: 1;
+    min-height: 0;
+    height: auto;
+  }
+
+  body.editor-page #visualTree {
+    height: 100%;
+  }
+}
+
 body.theme-dark .visual-canvas {
   background-color: #132a46;
   background-image:
@@ -345,7 +654,7 @@ body.theme-dark .visual-canvas {
 }
 
 #visualTree .person rect {
-  fill: var(--surface);
+  fill: var(--person-bubble-bg, var(--surface));
   stroke: var(--border);
   stroke-width: 2px;
   filter: drop-shadow(0 4px 12px rgba(0,0,0,0.15));
@@ -1032,6 +1341,12 @@ body.theme-dark .add-member-card {
 }
 
 @media (max-width: 560px) {
+  .form-group-setting {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
   body.editor-page:not(.focus-mode) .app-header .controls.controls-editor > button,
   body.editor-page:not(.focus-mode) .app-header .controls.controls-editor > a > button {
     height: 42px;
@@ -1078,6 +1393,14 @@ body.theme-dark .json-status.invalid {
 body.theme-dark .privacy-badge.private {
   background: rgba(245, 101, 101, 0.2);
   color: #fc8181;
+}
+
+body.theme-dark .privacy-radio {
+  background: rgba(19, 42, 70, 0.9);
+}
+
+body.theme-dark .setting-toggle-track {
+  background: rgba(19, 42, 70, 0.9);
 }
 
 /* JSON Editor Dark Mode - Ensure Solid Backgrounds */
