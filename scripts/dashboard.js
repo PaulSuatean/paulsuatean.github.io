@@ -28,11 +28,95 @@ function notifyUser(message, type = 'error', options = {}) {
   }
 }
 
+function parseTreeFlag(value, fallback = true) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['1', 'true', 'yes', 'on', 'enabled'].includes(normalized)) return true;
+    if (['0', 'false', 'no', 'off', 'disabled'].includes(normalized)) return false;
+  }
+  return fallback;
+}
+
+function resolveTreeFeatureSettings(tree) {
+  const setupContext = tree?.wizardContext && typeof tree.wizardContext === 'object'
+    ? tree.wizardContext
+    : (tree?.data?.setupContext && typeof tree.data.setupContext === 'object' ? tree.data.setupContext : null);
+
+  const calendarRaw = Object.prototype.hasOwnProperty.call(tree || {}, 'enableCalendarDates')
+    ? tree.enableCalendarDates
+    : (
+      Object.prototype.hasOwnProperty.call(tree || {}, 'enableBirthdays')
+        ? tree.enableBirthdays
+        : setupContext?.enableBirthdays
+    );
+  const globeRaw = Object.prototype.hasOwnProperty.call(tree || {}, 'enableGlobeCountries')
+    ? tree.enableGlobeCountries
+    : setupContext?.enableGlobeCountries;
+
+  return {
+    enableCalendarDates: parseTreeFlag(calendarRaw, true),
+    enableGlobeCountries: parseTreeFlag(globeRaw, true)
+  };
+}
+
+function getRecommendedStoreProduct(tree) {
+  const settings = resolveTreeFeatureSettings(tree);
+  if (
+    window.AncestrioStoreUtils &&
+    typeof window.AncestrioStoreUtils.deriveRecommendedProduct === 'function'
+  ) {
+    return window.AncestrioStoreUtils.deriveRecommendedProduct(settings);
+  }
+  if (settings.enableCalendarDates && settings.enableGlobeCountries) return 'bundle';
+  if (settings.enableCalendarDates) return 'calendar';
+  if (settings.enableGlobeCountries) return 'globe';
+  return 'parchment';
+}
+
+
+function buildStoreUrlForDashboard(context = {}) {
+  const payload = {
+    product: String(context.product || 'bundle').toLowerCase(),
+    source: 'dashboard',
+    view: context.view || 'tree',
+    treeId: context.treeId || '',
+    treeName: context.treeName || ''
+  };
+
+  if (
+    window.AncestrioStoreUtils &&
+    typeof window.AncestrioStoreUtils.buildStoreUrl === 'function'
+  ) {
+    return window.AncestrioStoreUtils.buildStoreUrl(payload, { path: 'store.html' });
+  }
+
+  const params = new URLSearchParams();
+  params.set('product', payload.product);
+  params.set('source', payload.source);
+  params.set('view', payload.view);
+  if (payload.treeId) params.set('treeId', payload.treeId);
+  if (payload.treeName) params.set('treeName', payload.treeName);
+  return `store.html?${params.toString()}`;
+}
+
+function openStoreFromDashboard(context = {}) {
+  window.location.href = buildStoreUrlForDashboard(context);
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   // Theme toggle
   window.AncestrioTheme?.initThemeToggle();
 
   // Event listeners
+  document.getElementById('storeBtn')?.addEventListener('click', () => {
+    openStoreFromDashboard({
+      product: 'bundle',
+      source: 'dashboard',
+      view: 'tree'
+    });
+  });
   document.getElementById('logoutBtn').addEventListener('click', logout);
   document.getElementById('createTreeBtn').addEventListener('click', showCreateModal);
   document.getElementById('createTreeBtnEmpty')?.addEventListener('click', showCreateModal);
@@ -952,6 +1036,7 @@ function renderTreeCard(tree) {
   const createdDate = tree.createdAt ? new Date(tree.createdAt.toDate()).toLocaleDateString() : 'Unknown';
   const descriptionText = typeof tree.description === 'string' ? tree.description.trim() : '';
   const hasDescription = descriptionText.length > 0;
+  const recommendedProduct = getRecommendedStoreProduct(tree);
 
   const card = document.createElement('div');
   card.className = 'tree-card';
@@ -999,6 +1084,10 @@ function renderTreeCard(tree) {
         <span class="material-symbols-outlined">edit</span>
         Edit
       </button>
+      <button class="btn-store" data-action="open-store" data-tree-id="${tree.id}">
+        <span class="material-symbols-outlined">shopping_bag</span>
+        Order
+      </button>
     </div>
   `;
 
@@ -1017,6 +1106,15 @@ function renderTreeCard(tree) {
     if (targetTreeId) {
       editTree(targetTreeId);
     }
+  });
+  card.querySelector('[data-action="open-store"]')?.addEventListener('click', () => {
+    openStoreFromDashboard({
+      product: recommendedProduct,
+      source: 'dashboard',
+      view: 'tree',
+      treeId: tree.id || '',
+      treeName: sanitizeText(tree.name)
+    });
   });
 
   treesGrid.appendChild(card);

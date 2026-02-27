@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ancestrio Store</title>
+  <meta name="description" content="Order printed keepsakes from your family tree data." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  <link rel="stylesheet" href="../styles/theme.css" />
+  <link rel="stylesheet" href="../styles/base.css" />
+  <link rel="stylesheet" href="../styles/components.css" />
+  <link rel="stylesheet" href="../styles/page-overrides.css" />
+  <link rel="stylesheet" href="../styles/page-common.css" />
+  <link rel="stylesheet" href="../styles/pages/store.css" />
+</head>
+<body class="store-page">
+  <header class="topbar app-header">
+    <div class="brand-group">
+      <button id="themeBtn" title="Switch theme" aria-label="Switch theme">
+        <span class="material-symbols-outlined" aria-hidden="true">light_mode</span>
+      </button>
+      <div class="brand">Ancestrio Store</div>
+    </div>
+    <div class="controls controls-store">
+      <a id="storeBackBtn" href="dashboard.html" class="icon-btn" title="Back" aria-label="Back">
+        <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
+      </a>
+    </div>
+  </header>
+
+  <main class="store-main">
+    <section class="store-hero">
+      <p class="store-kicker">Print Your Family Story</p>
+      <h1>Family Keepsakes</h1>
+      <p class="store-subtitle">Choose a product, submit your order form, and we will follow up with details.</p>
+    </section>
+
+    <div class="store-layout">
+      <section class="store-products" aria-labelledby="productsHeading">
+        <h2 id="productsHeading">Choose Your Keepsake</h2>
+        <p class="store-products-subtitle">Select a product to open customization and complete your order.</p>
+        <div class="product-grid" id="productGrid">
+          <article class="store-product-card" data-product="parchment" aria-label="Printed Parchment Family Tree">
+            <div class="product-photo-wrap">
+              <img
+                class="product-photo"
+                src="../images/store/parchment.webp"
+                alt="Parchment sheet and fountain pen on a wooden desk"
+                loading="lazy"
+              />
+            </div>
+            <h3>Printed Parchment Family Tree</h3>
+            <p>Choose one style and get your family tree printed on premium paper.</p>
+            <p class="product-price" data-price="parchment"></p>
+            <div class="product-card-actions">
+              <button type="button" class="product-cta" data-product-action="preview">View details</button>
+            </div>
+          </article>
+
+          <article class="store-product-card" data-product="calendar" aria-label="Mini Birthday Calendar">
+            <div class="product-photo-wrap">
+              <img
+                class="product-photo"
+                src="../images/store/calendar.webp"
+                alt="Desk planner and calendar pages ready for notes"
+                loading="lazy"
+              />
+            </div>
+            <h3>Mini Birthday Calendar</h3>
+            <p>Compact printable calendars with all family birthdays in one place.</p>
+            <p class="product-price" data-price="calendar"></p>
+            <div class="product-card-actions">
+              <button type="button" class="product-cta" data-product-action="preview">View details</button>
+            </div>
+          </article>
+
+          <article class="store-product-card" data-product="globe" aria-label="Family Journey Globe">
+            <div class="product-photo-wrap">
+              <img
+                class="product-photo"
+                src="../images/store/globe.webp"
+                alt="Travel globe with marked destinations"
+                loading="lazy"
+              />
+            </div>
+            <h3>Family Journey Globe</h3>
+            <p>Small display globe marking countries visited by your family.</p>
+            <p class="product-price" data-price="globe"></p>
+            <div class="product-card-actions">
+              <button type="button" class="product-cta" data-product-action="preview">View details</button>
+            </div>
+          </article>
+        </div>
+        <p class="store-help-note">Select a product to open details and continue to order in the same panel.</p>
+      </section>
+    </div>
+  </main>
+
+
+  <div class="modal store-product-modal" id="storeProductModal" aria-hidden="true">
+    <div class="modal-dialog store-modal-dialog store-product-dialog" id="storeProductDialog" role="dialog" aria-modal="true" aria-labelledby="productPreviewHeading" data-page="preview">
+      <button type="button" class="modal-close store-modal-close" id="closeStoreProductModal" aria-label="Close store modal">&times;</button>
+
+      <div class="store-modal-pages" id="storeModalPages">
+        <section class="store-modal-page store-modal-page-preview is-active" id="storePreviewPage" aria-hidden="false">
+          <div class="store-product-preview">
+            <div class="store-product-media">
+              <figure class="store-preview-figure">
+                <img
+                  id="productPreviewImage"
+                  class="store-preview-image"
+                  src="../images/store/parchment.webp"
+                  alt="Product preview"
+                />
+                <figcaption class="store-preview-caption" id="productPreviewCaption"></figcaption>
+              </figure>
+              <div class="store-preview-thumbs" id="productPreviewThumbs" aria-label="Product photos"></div>
+            </div>
+            <div class="store-product-info">
+              <p class="store-modal-kicker">Keepsake Details</p>
+              <h2 id="productPreviewHeading">Printed Parchment Family Tree</h2>
+              <p class="store-product-preview-price" id="productPreviewPrice"></p>
+              <p class="store-modal-subtitle" id="productPreviewDescription"></p>
+              <ul class="store-product-highlights" id="productPreviewHighlights"></ul>
+              <div class="store-product-actions">
+                <button type="button" class="store-continue-btn" id="continueShoppingBtn">Keep Browsing</button>
+                <button type="button" class="btn-primary store-order-open-btn" id="openOrderFromPreviewBtn">Order</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="store-modal-page store-modal-page-order" id="storeOrderPage" aria-hidden="true">
+          <div class="store-modal-body">
+            <div class="store-order-header">
+              <button type="button" class="store-order-back-btn" id="orderPageBackBtn">Back to details</button>
+              <p class="store-order-step">Step 2 of 2</p>
+            </div>
+            <div class="store-order-title-block">
+              <p class="store-modal-kicker">Customize and Order</p>
+              <h2 id="orderHeading">Order Form</h2>
+              <p class="store-modal-subtitle" id="selectedProductSummary"></p>
+              <p class="order-auth-state" id="orderAuthState">Loading account details...</p>
+
+              <div class="order-login-required" id="orderLoginRequired" style="display: none;">
+                <p>Sign in is optional. It helps auto-fill your account details before placing the order.</p>
+                <a id="orderLoginLink" class="btn-primary login-order-btn" href="auth.html">Sign In (Optional)</a>
+              </div>
+            </div>
+
+            <form id="orderForm" novalidate data-formspree-endpoint="https://formsubmit.co/el/lecetu">
+              <div class="order-form-grid">
+                <div class="order-form-fields">
+                  <div class="form-group">
+                    <label class="form-label" for="contactName">Contact Name</label>
+                    <input class="form-input" id="contactName" type="text" maxlength="120" required />
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label" for="contactEmail">Contact Email</label>
+                    <input class="form-input" id="contactEmail" type="email" maxlength="160" required />
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label" for="contactPhone">Phone Number</label>
+                    <input class="form-input" id="contactPhone" type="tel" maxlength="32" required placeholder="+1 555 123 4567" />
+                  </div>
+
+                  <div class="form-group form-group-compact">
+                    <label class="form-label" for="orderQuantity">Quantity</label>
+                    <input class="form-input" id="orderQuantity" type="number" min="1" max="999" value="1" required />
+                  </div>
+
+                  <div class="form-group form-group-wide">
+                    <label class="form-label" for="shippingAddress1">Address Line 1</label>
+                    <input class="form-input" id="shippingAddress1" type="text" maxlength="160" required placeholder="Street and number" />
+                  </div>
+
+                  <div class="form-group form-group-wide">
+                    <label class="form-label" for="shippingAddress2">Address Line 2 (Optional)</label>
+                    <input class="form-input" id="shippingAddress2" type="text" maxlength="160" placeholder="Apartment, suite, floor, etc." />
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label" for="shippingCity">City</label>
+                    <input class="form-input" id="shippingCity" type="text" maxlength="80" required />
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label" for="shippingRegion">State / Province</label>
+                    <input class="form-input" id="shippingRegion" type="text" maxlength="80" required />
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label" for="shippingPostalCode">Postal Code</label>
+                    <input class="form-input" id="shippingPostalCode" type="text" maxlength="20" required />
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label" for="shippingCountry">Country</label>
+                    <input class="form-input" id="shippingCountry" type="text" maxlength="80" required />
+                  </div>
+
+                  <div class="form-group form-group-wide">
+                    <label class="form-label" for="orderNote">Note (Optional)</label>
+                    <textarea class="form-input" id="orderNote" rows="5" maxlength="500" placeholder="Any details or preferences for this order"></textarea>
+                  </div>
+                </div>
+
+                <div class="order-form-actions">
+                  <div class="price-summary" id="priceSummary">
+                    <div class="summary-row">
+                      <span>Unit price</span>
+                      <strong id="summaryUnitPrice"></strong>
+                    </div>
+                    <div class="summary-row">
+                      <span>Subtotal</span>
+                      <strong id="summarySubtotal"></strong>
+                    </div>
+                    <div class="summary-row" id="summaryDiscountRow">
+                      <span>Discount</span>
+                      <strong id="summaryDiscount"></strong>
+                    </div>
+                    <div class="summary-row total-row">
+                      <span>Total</span>
+                      <strong id="summaryTotal"></strong>
+                    </div>
+                  </div>
+
+                  <button type="submit" class="btn-primary order-submit-btn" id="submitOrderBtn">Submit Order</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script src="../scripts/runtime.js"></script>
+  <script src="../scripts/night-sky.js"></script>
+  <script src="../scripts/day-clouds.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="../scripts/theme-toggle.js"></script>
+  <script src="../scripts/firebase-config.js?v=5"></script>
+  <script src="../scripts/store-utils.js"></script>
+  <script src="../scripts/store.js"></script>
+  <script
+    type="text/plain"
+    data-consent="optional"
+    data-name="BMC-Widget"
+    data-cfasync="false"
+    data-src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js"
+    data-id="paulsuatean"
+    data-description="Support me on Buy me a coffee!"
+    data-message=""
+    data-color="#FFDD00"
+    data-position="Right"
+    data-x_margin="18"
+    data-y_margin="18"
+  ></script>
+  <script src="../scripts/cookie-consent.js"></script>
+</body>
+</html>

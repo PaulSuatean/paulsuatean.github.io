@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="../styles/base.css" />
     <link rel="stylesheet" href="../styles/components.css" />
     <link rel="stylesheet" href="../styles/page-overrides.css" />
+    <link rel="stylesheet" href="../styles/pages/tree-viewer.css" />
   </head>
   <body class="tree-viewer-page">
     <header class="topbar app-header">
@@ -67,6 +68,17 @@
       </label>
       <span></span>
     </div>
+
+    <aside id="viewStylePanel" class="view-style-panel" aria-label="Viewer style settings">
+      <div class="view-style-group">
+        <p class="view-style-group-title">Background</p>
+        <div id="viewBackgroundOptions" class="view-style-options" role="radiogroup" aria-label="Background style"></div>
+      </div>
+      <div class="view-style-group">
+        <p class="view-style-group-title">Bubbles</p>
+        <div id="viewBubbleOptions" class="view-style-options" role="radiogroup" aria-label="Bubble style"></div>
+      </div>
+    </aside>
 
     <!-- Search Bar -->
     <div id="searchBar" class="search-bar">
@@ -195,6 +207,8 @@
     <script src="../scripts/main/empty-state-ui.js"></script>
     <script src="../scripts/main/globe-ui.js"></script>
     <script src="../scripts/main/tree-renderer.js"></script>
+    <script src="../scripts/main/view-style-ui.js"></script>
+    <script src="../scripts/store-utils.js"></script>
     
     <script src="../scripts/main.js"></script>
     <script

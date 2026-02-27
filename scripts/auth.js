@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const anonymousSignInBtn = document.getElementById('anonymousSignIn');
   const compactAuthLayout = window.matchMedia('(max-width: 768px)');
   const scheduleFormHeightSync = debounce(syncAuthFormHeights, 120);
+  const postAuthRedirect = resolvePostAuthRedirect();
 
   console.log('DOM elements found:', { loginForm, signupForm, errorMessage });
 
@@ -78,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
       await signInWithPasswordIdentifier(resolvedLogin, password);
       localStorage.removeItem('guestMode');
       console.log('Login successful, redirecting...');
-      window.location.href = 'dashboard.html';
+      redirectAfterAuth();
     } catch (error) {
       console.error('Login error:', error);
       showError(getLoginErrorMessageForIdentifier(error.code, resolvedLogin));
@@ -134,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
       
       console.log('Signup successful, redirecting...');
       localStorage.removeItem('guestMode');
-      window.location.href = 'dashboard.html';
+      redirectAfterAuth();
     } catch (error) {
       console.error('Signup error:', error);
       showError(getErrorMessage(error.code));
@@ -165,7 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       
       localStorage.removeItem('guestMode');
-      window.location.href = 'dashboard.html';
+      redirectAfterAuth();
     } catch (error) {
       if (error.code !== 'auth/popup-closed-by-user') {
         showError(getErrorMessage(error.code));
@@ -182,6 +183,62 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Helper functions
+  function redirectAfterAuth() {
+    window.location.href = postAuthRedirect;
+  }
+
+  function resolvePostAuthRedirect() {
+    const nextRaw = new URLSearchParams(window.location.search).get('next');
+    const safeNext = sanitizeNextPath(nextRaw);
+    return safeNext || 'dashboard.html';
+  }
+
+  function sanitizeNextPath(rawValue) {
+    if (typeof rawValue !== 'string') return '';
+    const trimmed = rawValue.trim();
+    if (!trimmed || trimmed.length > 700) return '';
+
+    const lower = trimmed.toLowerCase();
+    if (
+      lower.startsWith('http://') ||
+      lower.startsWith('https://') ||
+      lower.startsWith('//') ||
+      lower.startsWith('javascript:') ||
+      lower.startsWith('data:')
+    ) {
+      return '';
+    }
+
+    if (trimmed.includes('\\')) return '';
+
+    const allowedPaths = new Set([
+      '/pages/contact.html',
+      '/pages/dashboard.html',
+      '/pages/demo-tree.html',
+      '/pages/editor.html',
+      '/pages/store.html',
+      '/pages/tree.html'
+    ]);
+
+    let parsed;
+    try {
+      parsed = new URL(trimmed, `${window.location.origin}/pages/`);
+    } catch (_) {
+      return '';
+    }
+
+    if (parsed.origin !== window.location.origin) return '';
+
+    const normalizedPath = parsed.pathname.replace(/\/+/g, '/');
+    if (!allowedPaths.has(normalizedPath)) return '';
+
+    const relativePath = normalizedPath.startsWith('/pages/')
+      ? normalizedPath.slice('/pages/'.length)
+      : normalizedPath.replace(/^\//, '');
+
+    return `${relativePath}${parsed.search}${parsed.hash}`;
+  }
+
   function showError(message) {
     errorMessage.textContent = message;
     errorMessage.classList.add('show');

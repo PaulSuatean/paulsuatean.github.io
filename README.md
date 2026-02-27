@@ -11,7 +11,7 @@ Do not use Firebase Storage or any service that costs money in this project.
 ```
 .
 |- index.html                 # landing/home page
-|- pages/                     # app pages (auth, dashboard, editor, tree, contact, demo)
+|- pages/                     # app pages (auth, dashboard, editor, tree, contact, demo, store)
 |- scripts/                   # JavaScript modules
 |- styles/                    # shared and page-specific CSS
 |- images/                    # person photos and static assets
@@ -36,3 +36,12 @@ Use only the root files:
 - Dashboard: `pages/dashboard.html`
 - Editor: `pages/editor.html`
 - Viewer: `pages/tree.html`
+- Demo viewer: `pages/demo-tree.html`
+- Store: `pages/store.html`
+
+## Store order capture
+
+- Store ordering is lead capture only in v1 (no payment checkout flow yet).
+- Email notifications are sent through Formspree or FormSubmit from the store order form.
+- Configure the endpoint in `pages/store.html` on `#orderForm[data-formspree-endpoint]`.
+- If a user is signed in, the order is also written to Firestore collection: `storeOrders`.

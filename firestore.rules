@@ -1,6 +1,169 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isNonEmptyString(value, maxLen) {
+      return value is string && value.size() > 0 && value.size() <= maxLen;
+    }
+
+    function isStringWithMax(value, maxLen) {
+      return value is string && value.size() <= maxLen;
+    }
+
+    function isAllowedProductSku(value) {
+      return value == "parchment" ||
+             value == "calendar" ||
+             value == "globe" ||
+             value == "bundle";
+    }
+
+    function isAllowedSource(value) {
+      return value == "landing" ||
+             value == "dashboard" ||
+             value == "tree" ||
+             value == "demo-tree";
+    }
+
+    function isAllowedView(value) {
+      return value == "tree" ||
+             value == "calendar" ||
+             value == "globe";
+    }
+
+    function isAllowedParchmentStyle(value) {
+      return value == "Classic" ||
+             value == "Minimal" ||
+             value == "Vintage";
+    }
+
+    function isValidOrderOptions(options, productSku) {
+      return options is map &&
+             options.keys().hasOnly(["parchmentStyle"]) &&
+             (
+               productSku == "parchment"
+                 ? ("parchmentStyle" in options && isAllowedParchmentStyle(options.parchmentStyle))
+                 : !("parchmentStyle" in options)
+             );
+    }
+
+    function isValidOrderContext(context) {
+      return context is map &&
+             context.keys().hasAll(["source", "view", "treeId", "treeName", "originPath"]) &&
+             context.keys().hasOnly(["source", "view", "treeId", "treeName", "originPath"]) &&
+             isAllowedSource(context.source) &&
+             isAllowedView(context.view) &&
+             isStringWithMax(context.treeId, 120) &&
+             isStringWithMax(context.treeName, 160) &&
+             isNonEmptyString(context.originPath, 700);
+    }
+
+    function hasValidUnitPrice(productSku, unitPrice) {
+      return (productSku == "parchment" && unitPrice == 69) ||
+             (productSku == "calendar" && unitPrice == 24) ||
+             (productSku == "globe" && unitPrice == 79) ||
+             (productSku == "bundle" && unitPrice == 172);
+    }
+
+    function hasValidDiscountPercent(productSku, discountPercent) {
+      return (productSku == "bundle" && discountPercent == 10) ||
+             (productSku != "bundle" && discountPercent == 0);
+    }
+
+    function isValidShippingAddress(address) {
+      return address is map &&
+             address.keys().hasAll(["line1", "line2", "city", "region", "postalCode", "country"]) &&
+             address.keys().hasOnly(["line1", "line2", "city", "region", "postalCode", "country"]) &&
+             isNonEmptyString(address.line1, 160) &&
+             isStringWithMax(address.line2, 160) &&
+             isNonEmptyString(address.city, 80) &&
+             isNonEmptyString(address.region, 80) &&
+             isNonEmptyString(address.postalCode, 20) &&
+             isNonEmptyString(address.country, 80);
+    }
+
+    function isValidStoreOrder(data) {
+      return data.keys().hasAll([
+               "userId",
+               "userEmail",
+               "userDisplayName",
+               "contactName",
+               "contactEmail",
+               "contactPhone",
+               "shippingAddress",
+               "productSku",
+               "productLabel",
+               "currency",
+               "unitPrice",
+               "quantity",
+               "subtotal",
+               "discountPercent",
+               "discountAmount",
+               "total",
+               "options",
+               "note",
+               "context",
+               "status",
+               "createdAt",
+               "updatedAt"
+             ]) &&
+             data.keys().hasOnly([
+               "userId",
+               "userEmail",
+               "userDisplayName",
+               "contactName",
+               "contactEmail",
+               "contactPhone",
+               "shippingAddress",
+               "productSku",
+               "productLabel",
+               "currency",
+               "unitPrice",
+               "quantity",
+               "subtotal",
+               "discountPercent",
+               "discountAmount",
+               "total",
+               "options",
+               "note",
+               "context",
+               "status",
+               "createdAt",
+               "updatedAt"
+             ]) &&
+             isNonEmptyString(data.userId, 120) &&
+             isNonEmptyString(data.userEmail, 160) &&
+             isStringWithMax(data.userDisplayName, 120) &&
+             isNonEmptyString(data.contactName, 120) &&
+             isNonEmptyString(data.contactEmail, 160) &&
+             isNonEmptyString(data.contactPhone, 32) &&
+             isValidShippingAddress(data.shippingAddress) &&
+             isAllowedProductSku(data.productSku) &&
+             isNonEmptyString(data.productLabel, 120) &&
+             data.currency == "EUR" &&
+             data.unitPrice is number &&
+             data.unitPrice >= 0 &&
+             hasValidUnitPrice(data.productSku, data.unitPrice) &&
+             data.quantity is int &&
+             data.quantity > 0 &&
+             data.quantity <= 999 &&
+             data.subtotal is number &&
+             data.subtotal >= 0 &&
+             data.discountPercent is number &&
+             data.discountPercent >= 0 &&
+             hasValidDiscountPercent(data.productSku, data.discountPercent) &&
+             data.discountAmount is number &&
+             data.discountAmount >= 0 &&
+             data.discountAmount <= data.subtotal &&
+             data.total is number &&
+             data.total >= 0 &&
+             data.total <= data.subtotal &&
+             isValidOrderOptions(data.options, data.productSku) &&
+             isStringWithMax(data.note, 500) &&
+             isValidOrderContext(data.context) &&
+             data.status == "new" &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
     // Users collection - users can read/write their own data
     match /users/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;
@@ -22,6 +185,18 @@ service cloud.firestore {
       // Allow updating/deleting only trees the user owns
       allow update, delete: if request.auth != null && 
                                resource.data.userId == request.auth.uid;
+    }
+
+    // Store orders - users can create and view only their own orders.
+    match /storeOrders/{orderId} {
+      allow create: if request.auth != null &&
+                       request.resource.data.userId == request.auth.uid &&
+                       isValidStoreOrder(request.resource.data);
+
+      allow read: if request.auth != null &&
+                     resource.data.userId == request.auth.uid;
+
+      allow update, delete: if false;
     }
   }
 }

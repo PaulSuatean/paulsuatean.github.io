@@ -1,0 +1,333 @@
+/* Viewer style panel + style presets for tree and demo-tree pages. */
+
+body.tree-viewer-page {
+  --viewer-style-panel-width: 214px;
+  --viewer-style-panel-left: 14px;
+  --viewer-style-panel-top: calc(var(--header-corner-top, 24px) + var(--header-corner-size, 48px) + 14px);
+  --viewer-style-panel-bottom: calc(env(safe-area-inset-bottom) + 14px);
+  --viewer-calendar-panel-gap: 12px;
+  --viewer-calendar-panel-left: calc(var(--viewer-style-panel-left) + var(--viewer-style-panel-width) + var(--viewer-calendar-panel-gap));
+  --viewer-calendar-panel-right: 10px;
+}
+
+.view-style-panel {
+  position: fixed;
+  left: var(--viewer-style-panel-left);
+  top: var(--viewer-style-panel-top);
+  bottom: var(--viewer-style-panel-bottom);
+  width: min(var(--viewer-style-panel-width), calc(100vw - (var(--viewer-style-panel-left) * 2)));
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 22px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.86);
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(12px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+body.theme-dark .view-style-panel {
+  background: rgba(11, 29, 51, 0.88);
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+}
+
+body.tree-viewer-page.view-calendar #birthdaySection {
+  inset: var(--viewer-style-panel-top) var(--viewer-calendar-panel-right) var(--viewer-style-panel-bottom) var(--viewer-calendar-panel-left);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+body.theme-dark.tree-viewer-page.view-calendar #birthdaySection {
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+}
+
+.view-style-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.38);
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  background: rgba(241, 245, 249, 0.78);
+  background: color-mix(in srgb, var(--surface-2) 78%, transparent);
+}
+
+.view-style-group-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.view-style-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.view-style-option {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 999px;
+  min-height: 36px;
+  width: 100%;
+  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background var(--transition-base) ease, border-color var(--transition-base) ease, color var(--transition-base) ease, box-shadow var(--transition-base) ease;
+}
+
+.view-style-option:hover {
+  border-color: var(--accent-3);
+}
+
+.view-style-option:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.view-style-option.is-active {
+  background: var(--gradient-secondary);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 10px 18px rgba(59, 130, 246, 0.24);
+}
+
+.view-style-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.2);
+  border: 1px solid color-mix(in srgb, var(--border) 85%, #000000 15%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  flex: 0 0 auto;
+}
+
+.view-style-option.is-active .view-style-swatch {
+  border-color: rgba(255, 255, 255, 0.8);
+}
+
+.view-style-swatch.swatch-theme-default {
+  background: linear-gradient(155deg, #ffffff 0%, #f1f3f5 100%);
+}
+
+.view-style-swatch.swatch-parchment-classic {
+  background:
+    linear-gradient(165deg, #f2e5c7 0%, #e3d0aa 100%);
+}
+
+.view-style-swatch.swatch-parchment-vintage {
+  background:
+    linear-gradient(165deg, #d8c29a 0%, #b89c75 100%);
+}
+
+.view-style-swatch.swatch-parchment-minimal {
+  background:
+    linear-gradient(165deg, #f5ecd7 0%, #e9dcc0 100%);
+}
+
+.view-style-swatch.swatch-parchment-photo {
+  background-image: url("../../images/store/parchment.webp");
+  background-size: cover;
+  background-position: center;
+}
+
+.view-style-swatch.swatch-bubble-classic {
+  background: linear-gradient(155deg, #ffffff 0%, #f1f3f5 100%);
+}
+
+.view-style-swatch.swatch-bubble-ink {
+  background: linear-gradient(155deg, #f8ecd4 0%, #edd7ae 100%);
+}
+
+.view-style-swatch.swatch-bubble-soft {
+  background: linear-gradient(155deg, #f5f1e6 0%, #ece3cf 100%);
+}
+
+body.tree-viewer-page[data-view-bg="theme-default"] {
+  background: var(--page-bg-gradient);
+  background-attachment: fixed;
+}
+
+body.tree-viewer-page[data-view-bg="parchment-classic"] {
+  background-color: #ead9b4;
+  background-image:
+    radial-gradient(circle at 18% 20%, rgba(255, 255, 255, 0.34), transparent 34%),
+    radial-gradient(circle at 82% 78%, rgba(81, 55, 18, 0.09), transparent 40%),
+    repeating-linear-gradient(0deg, rgba(112, 78, 33, 0.05) 0 1px, transparent 1px 6px),
+    linear-gradient(162deg, #f0dfbd 0%, #dec596 50%, #e7d5ad 100%);
+  background-attachment: fixed;
+}
+
+body.tree-viewer-page[data-view-bg="parchment-vintage"] {
+  background-color: #cfb083;
+  background-image:
+    radial-gradient(circle at 74% 18%, rgba(255, 235, 189, 0.22), transparent 30%),
+    radial-gradient(circle at 22% 84%, rgba(91, 54, 21, 0.16), transparent 36%),
+    repeating-linear-gradient(90deg, rgba(66, 43, 18, 0.08) 0 1px, transparent 1px 8px),
+    linear-gradient(168deg, #d5b78b 0%, #b69263 52%, #cfb286 100%);
+  background-attachment: fixed;
+}
+
+body.tree-viewer-page[data-view-bg="parchment-minimal"] {
+  background-color: #efe2c6;
+  background-image:
+    radial-gradient(circle at 20% 22%, rgba(255, 255, 255, 0.3), transparent 36%),
+    radial-gradient(circle at 84% 72%, rgba(92, 66, 29, 0.07), transparent 42%),
+    linear-gradient(164deg, #f5ecd7 0%, #e9dbc0 52%, #f3e9d2 100%);
+  background-attachment: fixed;
+}
+
+body.tree-viewer-page[data-view-bg="parchment-photo"] {
+  background-color: #d9c39c;
+  background-image:
+    linear-gradient(180deg, rgba(56, 39, 18, 0.2) 0%, rgba(255, 251, 238, 0.12) 100%),
+    var(--viewer-bg-image, url("../../images/store/parchment.webp"));
+  background-repeat: no-repeat, no-repeat;
+  background-position: center center, center center;
+  background-size: auto, cover;
+  background-attachment: fixed, fixed;
+}
+
+body.tree-viewer-page[data-view-bg^="parchment"] .day-clouds,
+body.tree-viewer-page[data-view-bg^="parchment"] .night-sky {
+  opacity: 0 !important;
+}
+
+body.tree-viewer-page[data-view-bubble="bubble-classic"] {
+  --viewer-bubble-fill: var(--node-fill);
+  --viewer-bubble-stroke: var(--node-stroke);
+  --viewer-bubble-hover-fill: url(#personGradient);
+  --viewer-bubble-hover-stroke: var(--accent);
+  --viewer-bubble-shadow: var(--node-shadow);
+  --viewer-bubble-hover-shadow: drop-shadow(0 8px 24px rgba(59, 130, 246, 0.2));
+  --viewer-bubble-name-color: var(--text);
+  --viewer-bubble-meta-color: var(--muted);
+}
+
+body.tree-viewer-page[data-view-bubble="bubble-ink"] {
+  --viewer-bubble-fill: #efe0c0;
+  --viewer-bubble-stroke: rgba(88, 62, 21, 0.42);
+  --viewer-bubble-hover-fill: #e8d5b1;
+  --viewer-bubble-hover-stroke: #7a5a2a;
+  --viewer-bubble-shadow: drop-shadow(0 5px 13px rgba(63, 41, 12, 0.19));
+  --viewer-bubble-hover-shadow: drop-shadow(0 9px 20px rgba(63, 41, 12, 0.32));
+  --viewer-bubble-name-color: #3d2b16;
+  --viewer-bubble-meta-color: #5b4124;
+}
+
+body.tree-viewer-page[data-view-bubble="bubble-soft"] {
+  --viewer-bubble-fill: #f3ecdd;
+  --viewer-bubble-stroke: rgba(113, 90, 56, 0.26);
+  --viewer-bubble-hover-fill: #efe6d2;
+  --viewer-bubble-hover-stroke: rgba(113, 90, 56, 0.65);
+  --viewer-bubble-shadow: drop-shadow(0 4px 12px rgba(64, 47, 17, 0.14));
+  --viewer-bubble-hover-shadow: drop-shadow(0 8px 20px rgba(64, 47, 17, 0.24));
+  --viewer-bubble-name-color: #352a1a;
+  --viewer-bubble-meta-color: #6d5d44;
+}
+
+body.tree-viewer-page .person rect {
+  fill: var(--viewer-bubble-fill, #ffffff);
+  stroke: var(--viewer-bubble-stroke, rgba(0, 0, 0, 0.1));
+  filter: var(--viewer-bubble-shadow, drop-shadow(0 4px 12px rgba(0, 0, 0, 0.08)));
+}
+
+body.tree-viewer-page .person:hover rect {
+  fill: var(--viewer-bubble-hover-fill, url(#personGradient));
+  stroke: var(--viewer-bubble-hover-stroke, var(--accent));
+  filter: var(--viewer-bubble-hover-shadow, drop-shadow(0 8px 24px rgba(59, 130, 246, 0.2)));
+}
+
+body.tree-viewer-page .person .name {
+  fill: var(--viewer-bubble-name-color, var(--text));
+}
+
+body.tree-viewer-page .person .meta {
+  fill: var(--viewer-bubble-meta-color, var(--muted));
+}
+
+body.tree-viewer-page #tree.dna-active .person.primary rect,
+body.tree-viewer-page #tree.dna-active .person.dna-highlight rect {
+  stroke: #d4af37;
+  stroke-width: 3.5px;
+  animation: dnaRectPulse 3.6s ease-in-out infinite;
+}
+
+body.tree-viewer-page #tree.dna-active .person.dna-suppress rect {
+  stroke: var(--node-stroke);
+  stroke-width: 2px;
+  animation: none;
+}
+
+@media (max-width: 768px) {
+  body.tree-viewer-page {
+    --viewer-style-panel-width: 70px;
+    --viewer-style-panel-left: 8px;
+    --viewer-style-panel-top: calc(var(--header-corner-top, 12px) + var(--header-corner-size, 44px) + 10px);
+    --viewer-style-panel-bottom: calc(env(safe-area-inset-bottom) + 10px);
+    --viewer-calendar-panel-gap: 8px;
+    --viewer-calendar-panel-right: 6px;
+  }
+
+  .view-style-panel {
+    padding: 6px;
+    gap: 6px;
+    border-radius: 18px;
+  }
+
+  .view-style-group {
+    padding: 5px 3px;
+    border-radius: 14px;
+    gap: 5px;
+  }
+
+  .view-style-group-title {
+    display: none;
+  }
+
+  .view-style-options {
+    gap: 4px;
+  }
+
+  .view-style-option {
+    min-height: 38px;
+    padding: 6px 4px;
+    justify-content: center;
+    border-radius: 14px;
+  }
+
+  .view-style-option-label {
+    display: none;
+  }
+
+  .view-style-swatch {
+    width: 18px;
+    height: 18px;
+  }
+
+  body.tree-viewer-page.view-calendar #birthdaySection {
+    border-radius: 14px;
+    padding-inline: 6px;
+  }
+}

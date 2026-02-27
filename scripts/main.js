@@ -83,6 +83,9 @@
   const viewToggleButtons = document.querySelectorAll('.view-toggle-btn');
   const viewToggleInputs = document.querySelectorAll('.tw-toggle input[name="view-toggle"]');
   const viewToggle = document.querySelector('.view-toggle') || document.querySelector('.tw-toggle');
+  const viewStylePanel = document.getElementById('viewStylePanel');
+  const viewBackgroundOptions = document.getElementById('viewBackgroundOptions');
+  const viewBubbleOptions = document.getElementById('viewBubbleOptions');
   let calendarOpen = false;
   const birthdayTooltip = document.getElementById('birthdayTooltip');
   const searchBar = document.getElementById('searchBar');
@@ -103,6 +106,7 @@
   const personHierarchy = new Map(); // Store hierarchical info
   let activeTooltipCell = null;
   let familyTreeData = null; // Store the full data
+  let viewStyleController = null;
   let mobileMonthIndex = 0;
   const mobileQuery = window.matchMedia('(max-width: 640px)');
   let mobileShowAll = false;
@@ -584,6 +588,123 @@
   let currentView = localStorage.getItem('tree-view') || 'tree';
   let calendarViewEnabled = true;
   let globeViewEnabled = true;
+  const storeContextSource = isDemoTreePage() ? 'demo-tree' : 'tree';
+  let storeTreeId = '';
+  let storeTreeName = '';
+
+  function sanitizeStoreText(value, maxLength = 160) {
+    if (
+      typeof window !== 'undefined' &&
+      window.AncestrioStoreUtils &&
+      typeof window.AncestrioStoreUtils.sanitizeText === 'function'
+    ) {
+      return window.AncestrioStoreUtils.sanitizeText(value, maxLength);
+    }
+    return String(value == null ? '' : value)
+      .replace(/[\u0000-\u001f\u007f]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, Math.max(0, maxLength));
+  }
+
+  function sanitizeStoreTreeId(value) {
+    if (
+      typeof window !== 'undefined' &&
+      window.AncestrioStoreUtils &&
+      typeof window.AncestrioStoreUtils.sanitizeTreeId === 'function'
+    ) {
+      return window.AncestrioStoreUtils.sanitizeTreeId(value);
+    }
+    return sanitizeStoreText(value, 120).replace(/[^a-zA-Z0-9_-]/g, '');
+  }
+
+  function sanitizeStoreProduct(value, fallback = 'parchment') {
+    if (
+      typeof window !== 'undefined' &&
+      window.AncestrioStoreUtils &&
+      typeof window.AncestrioStoreUtils.sanitizeProduct === 'function'
+    ) {
+      return window.AncestrioStoreUtils.sanitizeProduct(value, fallback);
+    }
+    const normalized = sanitizeStoreText(value, 32).toLowerCase();
+    const allowed = ['parchment', 'calendar', 'globe', 'bundle'];
+    return allowed.includes(normalized) ? normalized : fallback;
+  }
+
+  function getStoreProductForView(view) {
+    if (view === 'calendar') return 'calendar';
+    if (view === 'globe') return 'globe';
+    return 'parchment';
+  }
+
+  function getStoreProductLabel(productSku) {
+    const sku = sanitizeStoreProduct(productSku);
+    if (
+      typeof window !== 'undefined' &&
+      window.AncestrioStoreUtils &&
+      typeof window.AncestrioStoreUtils.getProductBySku === 'function'
+    ) {
+      const product = window.AncestrioStoreUtils.getProductBySku(sku);
+      if (product) {
+        return product.shortLabel || product.label || 'Family keepsake';
+      }
+    }
+    if (sku === 'calendar') return 'Birthday Calendar';
+    if (sku === 'globe') return 'Family Globe';
+    if (sku === 'bundle') return 'Family Bundle';
+    return 'Parchment Print';
+  }
+
+  function getTreeIdFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return sanitizeStoreTreeId(params.get('id'));
+  }
+
+  function maybeStoreTreeName(rawValue) {
+    const candidate = sanitizeStoreText(rawValue, 160);
+    if (!candidate) return;
+    const lowered = candidate.toLowerCase();
+    if (['loading...', 'tree not found', 'private tree', 'error loading tree'].includes(lowered)) return;
+    storeTreeName = candidate;
+  }
+
+  function refreshStoreContext() {
+    const treeIdFromUrl = getTreeIdFromUrl();
+    if (treeIdFromUrl) {
+      storeTreeId = treeIdFromUrl;
+    }
+
+    if (typeof window !== 'undefined') {
+      maybeStoreTreeName(window.FIREBASE_TREE_NAME);
+    }
+    maybeStoreTreeName(document.getElementById('treeName')?.textContent || '');
+  }
+
+  function buildViewerStoreUrl(overrides = {}) {
+    const payload = {
+      product: sanitizeStoreProduct(overrides.product || getStoreProductForView(currentView)),
+      source: storeContextSource,
+      view: (overrides.view || currentView || 'tree'),
+      treeId: sanitizeStoreTreeId(overrides.treeId || storeTreeId),
+      treeName: sanitizeStoreText(overrides.treeName || storeTreeName, 160)
+    };
+
+    if (
+      typeof window !== 'undefined' &&
+      window.AncestrioStoreUtils &&
+      typeof window.AncestrioStoreUtils.buildStoreUrl === 'function'
+    ) {
+      return window.AncestrioStoreUtils.buildStoreUrl(payload, { path: 'store.html' });
+    }
+
+    const params = new URLSearchParams();
+    params.set('product', payload.product);
+    params.set('source', payload.source);
+    params.set('view', payload.view);
+    if (payload.treeId) params.set('treeId', payload.treeId);
+    if (payload.treeName) params.set('treeName', payload.treeName);
+    return `store.html?${params.toString()}`;
+  }
 
   function parseViewerFeatureFlag(value, fallback = true) {
     if (typeof value === 'boolean') return value;
@@ -640,6 +761,36 @@
     if (!isViewEnabled(currentView)) {
       currentView = 'tree';
     }
+  }
+
+  function initViewStylePanel() {
+    if (
+      typeof window === 'undefined' ||
+      !window.AncestrioViewStyleUI ||
+      typeof window.AncestrioViewStyleUI.createViewStyleController !== 'function'
+    ) {
+      return;
+    }
+
+    viewStyleController = window.AncestrioViewStyleUI.createViewStyleController({
+      panelEl: viewStylePanel,
+      backgroundContainer: viewBackgroundOptions,
+      bubbleContainer: viewBubbleOptions,
+      backgroundPresets: Array.isArray(window.AncestrioViewerBackgroundPresets)
+        ? window.AncestrioViewerBackgroundPresets
+        : undefined,
+      bubblePresets: Array.isArray(window.AncestrioViewerBubblePresets)
+        ? window.AncestrioViewerBubblePresets
+        : undefined,
+      onChange: () => {
+        requestAnimationFrame(() => {
+          updateViewToggleOffset();
+          if (currentView === 'tree') {
+            fitTreeWhenVisible(getTreeDefaultPadding(), 50);
+          }
+        });
+      }
+    });
   }
 
   let externalGlobeController = null;
@@ -762,7 +913,7 @@
     if (birthdaySection) birthdaySection.setAttribute('aria-hidden', nextView === 'calendar' ? 'false' : 'true');
     updateViewToggleUI();
     localStorage.setItem('tree-view', nextView);
-    
+
     if (nextView === 'globe') {
       if (focusModeActive) {
         focusModeActive = false;
@@ -810,6 +961,8 @@
     });
   }
   applyTreeViewSettings(typeof window !== 'undefined' ? window.FIREBASE_TREE_SETTINGS : null);
+  refreshStoreContext();
+  initViewStylePanel();
   setView(currentView);
 
   function getTreeDefaultPadding() {
@@ -833,38 +986,58 @@
   }
   function getTreeViewportInsets() {
     const node = svg.node();
-    if (!node) return { top: 0, bottom: 0 };
+    if (!node) return { top: 0, bottom: 0, left: 0, right: 0 };
     const svgRect = node.getBoundingClientRect();
-    if (!svgRect.width || !svgRect.height) return { top: 0, bottom: 0 };
+    if (!svgRect.width || !svgRect.height) return { top: 0, bottom: 0, left: 0, right: 0 };
 
-    const insets = { top: 0, bottom: 0 };
+    const insets = { top: 0, bottom: 0, left: 0, right: 0 };
     const midpointY = svgRect.top + (svgRect.height / 2);
+    const midpointX = svgRect.left + (svgRect.width / 2);
     const insetGap = 12;
 
-    const addInsetFromOverlay = (element) => {
-      if (!isOverlayVisible(element)) return;
+    const getOverlapRect = (element) => {
+      if (!isOverlayVisible(element)) return null;
       const rect = element.getBoundingClientRect();
       const overlapLeft = Math.max(svgRect.left, rect.left);
       const overlapRight = Math.min(svgRect.right, rect.right);
       const overlapTop = Math.max(svgRect.top, rect.top);
       const overlapBottom = Math.min(svgRect.bottom, rect.bottom);
 
-      if (overlapRight <= overlapLeft || overlapBottom <= overlapTop) return;
+      if (overlapRight <= overlapLeft || overlapBottom <= overlapTop) return null;
+      return { overlapLeft, overlapRight, overlapTop, overlapBottom };
+    };
 
-      const overlapCenterY = (overlapTop + overlapBottom) / 2;
+    const addVerticalInsetFromOverlay = (element) => {
+      const overlap = getOverlapRect(element);
+      if (!overlap) return;
+
+      const overlapCenterY = (overlap.overlapTop + overlap.overlapBottom) / 2;
       if (overlapCenterY <= midpointY) {
-        insets.top = Math.max(insets.top, overlapBottom - svgRect.top + insetGap);
+        insets.top = Math.max(insets.top, overlap.overlapBottom - svgRect.top + insetGap);
       } else {
-        insets.bottom = Math.max(insets.bottom, svgRect.bottom - overlapTop + insetGap);
+        insets.bottom = Math.max(insets.bottom, svgRect.bottom - overlap.overlapTop + insetGap);
       }
     };
 
-    addInsetFromOverlay(document.querySelector('.app-header .brand-group'));
-    addInsetFromOverlay(document.querySelector('.app-header .controls'));
-    addInsetFromOverlay(viewToggle);
+    const addHorizontalInsetFromOverlay = (element) => {
+      const overlap = getOverlapRect(element);
+      if (!overlap) return;
+
+      const overlapCenterX = (overlap.overlapLeft + overlap.overlapRight) / 2;
+      if (overlapCenterX <= midpointX) {
+        insets.left = Math.max(insets.left, overlap.overlapRight - svgRect.left + insetGap);
+      } else {
+        insets.right = Math.max(insets.right, svgRect.right - overlap.overlapLeft + insetGap);
+      }
+    };
+
+    addVerticalInsetFromOverlay(document.querySelector('.app-header .brand-group'));
+    addVerticalInsetFromOverlay(document.querySelector('.app-header .controls'));
+    addVerticalInsetFromOverlay(viewToggle);
     if (searchBar && searchBar.classList.contains('show')) {
-      addInsetFromOverlay(searchBar);
+      addVerticalInsetFromOverlay(searchBar);
     }
+    addHorizontalInsetFromOverlay(viewStylePanel);
 
     return insets;
   }
@@ -896,10 +1069,11 @@
     const w = svg.node().clientWidth;
     const h = svg.node().clientHeight;
     const insets = getTreeViewportInsets();
-    const horizontalPadding = padding;
+    const leftPadding = padding + insets.left;
+    const rightPadding = padding + insets.right;
     const topPadding = padding + insets.top;
     const bottomPadding = padding + insets.bottom;
-    const safeWidth = Math.max(1, w - horizontalPadding * 2);
+    const safeWidth = Math.max(1, w - leftPadding - rightPadding);
     const safeHeight = Math.max(1, h - topPadding - bottomPadding);
     const scale = Math.min(
       safeWidth / Math.max(bbox.width, 1),
@@ -911,7 +1085,7 @@
       : TREE_INITIAL_SCALE_CAP_DESKTOP;
     const appliedScale = Math.min(safeScale, initialCap);
     const maxScale = Math.max(TREE_ZOOM_MAX, safeScale * 5);
-    const centerX = w / 2;
+    const centerX = leftPadding + (safeWidth / 2);
     const centerY = topPadding + (safeHeight / 2);
     const tx = centerX - (bbox.x + (bbox.width / 2)) * appliedScale;
     const ty = centerY - (bbox.y + (bbox.height / 2)) * appliedScale + getTreeVerticalBias(safeHeight);
@@ -1153,8 +1327,16 @@
     updateExpandedMonthPlacement();
     if (currentView === 'globe') {
       resizeGlobe();
+    } else if (currentView === 'tree') {
+      fitTreeWhenVisible(getTreeDefaultPadding(), 40);
     }
     requestAnimationFrame(updateViewToggleOffset);
+  });
+  window.addEventListener('orientationchange', () => {
+    requestAnimationFrame(updateViewToggleOffset);
+    if (currentView === 'tree') {
+      fitTreeWhenVisible(getTreeDefaultPadding(), 40);
+    }
   });
   window.addEventListener('load', () => {
     if (currentView === 'globe') {
@@ -1219,6 +1401,7 @@
       setGlobeVisits(buildGlobeVisitsFromTreeData(data));
 
       if (typeof window !== 'undefined') {
+        refreshStoreContext();
         applyTreeViewSettings(window.FIREBASE_TREE_SETTINGS || null);
         setView(currentView);
       }
@@ -1597,7 +1780,15 @@
 
     const rect = topbar.getBoundingClientRect();
     const spacing = 8;
-    const top = Math.max(0, Math.round(rect.bottom + spacing));
+    let top = Math.max(0, Math.round(rect.bottom + spacing));
+    const featureBanner = document.querySelector('.feature-banner');
+    if (featureBanner) {
+      const bannerStyle = window.getComputedStyle(featureBanner);
+      if (bannerStyle.display !== 'none' && bannerStyle.visibility !== 'hidden') {
+        const bannerRect = featureBanner.getBoundingClientRect();
+        top = Math.max(top, Math.round(bannerRect.bottom + spacing));
+      }
+    }
     document.documentElement.style.setProperty('--view-toggle-top', `${top}px`);
   }
 

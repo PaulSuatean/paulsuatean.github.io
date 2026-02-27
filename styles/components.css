@@ -553,6 +553,37 @@ body.view-calendar #zoomOutBtn { display: none; }
   color: var(--text);
 }
 
+.store-context-banner {
+  background: linear-gradient(90deg, #1d4ed8 0%, #1e40af 60%, #0f172a 100%);
+  color: #ffffff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.18);
+}
+
+.store-context-banner a {
+  color: #ffffff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.store-context-banner a:hover {
+  color: #dbeafe;
+}
+
+body.theme-dark .store-context-banner {
+  background: linear-gradient(90deg, #1e3a8a 0%, #1e40af 55%, #0b1d33 100%);
+  border-bottom-color: rgba(191, 219, 254, 0.22);
+}
+
+@media (max-width: 640px) {
+  .store-context-banner {
+    font-size: 0.78rem;
+    line-height: 1.35;
+    gap: 4px;
+    padding: 6px 10px;
+  }
+}
+
 .carousel-btn,
 .month-nav-btn,
 .mobile-full-cal-btn {

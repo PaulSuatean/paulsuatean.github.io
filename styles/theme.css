@@ -91,13 +91,13 @@ body {
 }
 
 /* Shared hover animation used by landing page theme button, reused project-wide */
-button:not(.upcoming-birthday-display) {
+button:not(.upcoming-birthday-display):not(.modal-close) {
   position: relative;
   overflow: hidden;
   isolation: isolate;
 }
 
-button:not(.upcoming-birthday-display)::after {
+button:not(.upcoming-birthday-display):not(.modal-close)::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -108,16 +108,16 @@ button:not(.upcoming-birthday-display)::after {
   z-index: 0;
 }
 
-button:not(.upcoming-birthday-display) > * {
+button:not(.upcoming-birthday-display):not(.modal-close) > * {
   position: relative;
   z-index: 1;
 }
 
-button:not(.upcoming-birthday-display):not(:disabled):hover::after {
+button:not(.upcoming-birthday-display):not(.modal-close):not(:disabled):hover::after {
   opacity: var(--button-hover-overlay-opacity);
 }
 
-button:not(.upcoming-birthday-display):not(:disabled):hover {
+button:not(.upcoming-birthday-display):not(.modal-close):not(:disabled):hover {
   box-shadow: var(--shadow-md);
 }
 
@@ -251,3 +251,4 @@ body.theme-dark {
   --node-shadow: drop-shadow(0 10px 26px rgba(6, 12, 22, 0.35));
   background: #0b1d33;
 }
+
