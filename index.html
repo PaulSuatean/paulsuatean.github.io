@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ancestrio | Private Family Story Workspace</title>
-  <meta name="description" content="Build your family tree, explore birthdays and journeys, and order premium keepsakes from one private workspace." />
+  <meta name="description" content="Build your family tree, explore birthdays, and order printed paper family trees from one private workspace." />
   <link rel="icon" type="image/svg+xml" href="images/other/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -34,7 +34,7 @@
       <nav class="site-header__nav" id="siteNav" aria-label="Primary">
         <a href="index.html" aria-current="page">Home</a>
         <a href="pages/demo-tree.html">Demo</a>
-        <a href="pages/store.html?product=parchment&source=site-header&view=tree">Store</a>
+        <a href="pages/store.html?product=paper-print&source=site-header&view=tree">Store</a>
         <a href="pages/contact.html">Contact</a>
       </nav>
       <div class="site-header__actions">
@@ -51,9 +51,10 @@
     <section class="landing-hero">
       <div class="landing-hero-copy">
         <p class="landing-kicker">Private Family Workspace</p>
-        <h1>Build the family tree once. Reuse it across every meaningful keepsake.</h1>
+        <h1>Build the family tree once. Share it as a printed paper heirloom when you&#39;re ready.</h1>
         <p class="landing-subtitle">
-          Ancestrio gives families a calmer place to map generations, track birthdays, preview travel stories, and turn lived history into print-ready keepsakes.
+          Ancestrio gives families a calmer place to map generations, track birthdays, and prepare a print-ready family tree.
+          When the story feels complete, order a paper wall print in the style that fits your family.
         </p>
         <div class="landing-hero-cta">
           <a href="pages/auth.html" class="landing-btn landing-btn-primary">Start Your Tree</a>
@@ -61,49 +62,65 @@
         </div>
         <ul class="landing-metrics" aria-label="Platform highlights">
           <li><strong>Private</strong><span>Family workspace by default</span></li>
-          <li><strong>3 Views</strong><span>Tree, calendar, and globe</span></li>
-          <li><strong>Print Ready</strong><span>Keepsakes from real data</span></li>
+          <li><strong>Guided</strong><span>Single-column forms and big targets</span></li>
+          <li><strong>Print Ready</strong><span>Paper layouts from your tree</span></li>
         </ul>
       </div>
 
-      <aside class="landing-hero-stage" aria-label="Platform preview">
-        <article class="hero-stage-card hero-stage-card--primary">
-          <p class="hero-stage-label">Workspace Flow</p>
-          <h2>From family history to finished keepsake</h2>
-          <p>Organize one tree, then branch into browsing, birthday planning, and keepsake ordering without starting over.</p>
-          <div class="hero-stage-pills">
-            <span>Tree editor</span>
-            <span>Birthday calendar</span>
-            <span>Journey globe</span>
+      <aside class="landing-hero-stage landing-hero-carousel" aria-label="Printed paper family tree styles">
+        <div class="carousel" data-carousel>
+          <div class="carousel-header">
+            <p class="carousel-kicker">Printed Paper Styles</p>
+            <div class="carousel-controls">
+              <button class="carousel-btn" type="button" data-carousel-prev aria-label="Previous print style">
+                <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+              </button>
+              <button class="carousel-btn" type="button" data-carousel-next aria-label="Next print style">
+                <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
+              </button>
+            </div>
           </div>
-        </article>
 
-        <article class="hero-stage-card hero-stage-card--tree">
-          <div class="hero-stage-card-head">
-            <span class="material-symbols-outlined" aria-hidden="true">account_tree</span>
-            <span>Interactive tree</span>
+          <div class="carousel-viewport">
+            <div class="carousel-track" data-carousel-track>
+              <figure class="carousel-slide is-active" data-carousel-slide aria-hidden="false">
+                <img src="images/landing/print-01.webp" alt="Classic printed family tree in a framed wall display" loading="lazy" />
+                <figcaption class="carousel-caption">
+                  <span class="carousel-style">Classic</span>
+                  <span class="carousel-title">Classic Heritage</span>
+                </figcaption>
+              </figure>
+              <figure class="carousel-slide" data-carousel-slide aria-hidden="true">
+                <img src="images/landing/print-02.webp" alt="Ornate printed family tree with ceremonial framing" loading="lazy" />
+                <figcaption class="carousel-caption">
+                  <span class="carousel-style">Ornate</span>
+                  <span class="carousel-title">Gallery Ornate</span>
+                </figcaption>
+              </figure>
+              <figure class="carousel-slide" data-carousel-slide aria-hidden="true">
+                <img src="images/landing/print-03.webp" alt="Printed family tree featuring a colorful crest" loading="lazy" />
+                <figcaption class="carousel-caption">
+                  <span class="carousel-style">Heritage</span>
+                  <span class="carousel-title">Crest Edition</span>
+                </figcaption>
+              </figure>
+              <figure class="carousel-slide" data-carousel-slide aria-hidden="true">
+                <img src="images/landing/print-04.webp" alt="Minimal printed family tree on warm paper stock" loading="lazy" />
+                <figcaption class="carousel-caption">
+                  <span class="carousel-style">Minimal</span>
+                  <span class="carousel-title">Minimal Linework</span>
+                </figcaption>
+              </figure>
+            </div>
           </div>
-          <div class="hero-stage-tree">
-            <span class="hero-stage-node">Grandparents</span>
-            <span class="hero-stage-branch" aria-hidden="true"></span>
-            <span class="hero-stage-node">Parents</span>
-            <span class="hero-stage-branch" aria-hidden="true"></span>
-            <span class="hero-stage-node hero-stage-node--active">You</span>
-          </div>
-        </article>
 
-        <article class="hero-stage-card hero-stage-card--keepsake">
-          <div class="hero-stage-card-head">
-            <span class="material-symbols-outlined" aria-hidden="true">featured_seasonal_and_gifts</span>
-            <span>Keepsake studio</span>
+          <div class="carousel-dots" role="tablist" aria-label="Select a print style">
+            <button class="carousel-dot is-active" type="button" data-carousel-dot="0" aria-label="Show Classic Heritage style" aria-current="true"></button>
+            <button class="carousel-dot" type="button" data-carousel-dot="1" aria-label="Show Gallery Ornate style"></button>
+            <button class="carousel-dot" type="button" data-carousel-dot="2" aria-label="Show Crest Edition style"></button>
+            <button class="carousel-dot" type="button" data-carousel-dot="3" aria-label="Show Minimal Linework style"></button>
           </div>
-          <ul class="hero-stage-list">
-            <li>Parchment wall print</li>
-            <li>Birthday desk calendar</li>
-            <li>Family journey globe</li>
-          </ul>
-          <a href="pages/store.html?product=parchment&source=landing&view=tree" class="hero-panel-link">See the store</a>
-        </article>
+        </div>
       </aside>
     </section>
 
@@ -119,54 +136,66 @@
         <p>Big targets, cleaner controls, and single-column forms keep the experience easier on desktop and mobile.</p>
       </article>
       <article class="proof-card">
-        <p class="proof-card-label">Keepsakes</p>
-        <h2>Real outputs, not just a viewer</h2>
-        <p>Move from editing to ordering when the family wants something tangible on a wall, desk, or shelf.</p>
+        <p class="proof-card-label">Printed Paper</p>
+        <h2>Ready for the wall, not just a screen</h2>
+        <p>Move from editing to ordering when your family wants a printed paper family tree that feels archival.</p>
       </article>
     </section>
 
     <section class="landing-products" id="products" aria-labelledby="productsTitle">
       <div class="section-heading">
-        <p class="landing-kicker">Featured Keepsakes</p>
-        <h2 id="productsTitle">Designed around real family data</h2>
+        <p class="landing-kicker">Printed Paper Styles</p>
+        <h2 id="productsTitle">Choose the look that fits your family story</h2>
       </div>
       <div class="product-cards">
         <article class="product-card">
-          <img src="images/store/parchment.webp" alt="Printed parchment family tree" loading="lazy" />
+          <img src="images/landing/print-01.webp" alt="Classic printed family tree" loading="lazy" />
           <div class="product-card-body">
-            <p class="product-card-kicker">Wall display</p>
-            <h3>Printed Parchment Family Tree</h3>
-            <p>Turn your tree into an heirloom-style print with cleaner hierarchy and three style directions.</p>
-            <a href="pages/store.html?product=parchment&source=landing&view=tree">View product</a>
+            <p class="product-card-kicker">Classic</p>
+            <h3>Classic Heritage</h3>
+            <p>Balanced typography and traditional framing for an heirloom-style paper print.</p>
+            <a href="pages/store.html?product=paper-print&source=landing&view=tree">View style</a>
           </div>
         </article>
 
         <article class="product-card">
-          <img src="images/store/calendar.webp" alt="Birthday calendar pages" loading="lazy" />
+          <img src="images/landing/print-02.webp" alt="Ornate printed family tree" loading="lazy" />
           <div class="product-card-body">
-            <p class="product-card-kicker">Desk format</p>
-            <h3>Mini Birthday Calendar</h3>
-            <p>Keep birthdays visible month by month without re-entering dates outside the family workspace.</p>
-            <a href="pages/store.html?product=calendar&source=landing&view=calendar">View product</a>
+            <p class="product-card-kicker">Ornate</p>
+            <h3>Gallery Ornate</h3>
+            <p>Ceremonial detail and rich framing for a statement paper print.</p>
+            <a href="pages/store.html?product=paper-print&source=landing&view=tree">View style</a>
           </div>
         </article>
 
         <article class="product-card">
-          <img src="images/store/globe.webp" alt="Family globe with travel markers" loading="lazy" />
+          <img src="images/landing/print-04.webp" alt="Minimal printed family tree" loading="lazy" />
           <div class="product-card-body">
-            <p class="product-card-kicker">Story object</p>
-            <h3>Family Journey Globe</h3>
-            <p>Highlight countries tied to family movement, travel, and migration in a physical display piece.</p>
-            <a href="pages/store.html?product=globe&source=landing&view=globe">View product</a>
+            <p class="product-card-kicker">Minimal</p>
+            <h3>Minimal Linework</h3>
+            <p>Clean lines and airy spacing for a contemporary paper display.</p>
+            <a href="pages/store.html?product=paper-print&source=landing&view=tree">View style</a>
           </div>
         </article>
+      </div>
+      <div class="landing-ordering-strip" aria-label="Pricing and ordering details">
+        <div>
+          <p class="landing-kicker">Pricing &amp; Ordering</p>
+          <h3>Submit a request, then confirm the print by email.</h3>
+          <p>Choose a style, paper finish, and size. We confirm the proof, delivery region, and timeline before printing.</p>
+        </div>
+        <ul class="landing-ordering-list">
+          <li>Paper finishes: Matte, Satin, Gloss.</li>
+          <li>Sizes: A3, A2, or Custom.</li>
+          <li>Email confirmation includes proof and delivery timeline.</li>
+        </ul>
       </div>
     </section>
 
     <section class="landing-features" id="features" aria-labelledby="featuresTitle">
       <div class="section-heading">
         <p class="landing-kicker">Platform Capabilities</p>
-        <h2 id="featuresTitle">A browsing-first genealogy experience</h2>
+        <h2 id="featuresTitle">A browsing-first family workspace</h2>
       </div>
       <div class="feature-grid">
         <article class="feature-card feature-card--highlight">
@@ -175,14 +204,14 @@
           <p>Follow generations, inspect people, and navigate with search, zoom, focus mode, and a calmer viewer layout.</p>
         </article>
         <article class="feature-card">
-          <span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>
-          <h3>Birthday Calendar</h3>
-          <p>Transform birthdays into a usable monthly planning view with upcoming reminders already built in.</p>
+          <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>
+          <h3>Guided Data Entry</h3>
+          <p>Single-column forms and clear prompts make it easier to add people, relationships, and dates.</p>
         </article>
         <article class="feature-card">
-          <span class="material-symbols-outlined" aria-hidden="true">public</span>
-          <h3>Journey Globe</h3>
-          <p>Show family geography in a way that reads like a story instead of a spreadsheet of locations.</p>
+          <span class="material-symbols-outlined" aria-hidden="true">print</span>
+          <h3>Print-Ready Layouts</h3>
+          <p>Turn your tree into a clean paper layout with style options that read well on the wall.</p>
         </article>
         <article class="feature-card">
           <span class="material-symbols-outlined" aria-hidden="true">lock</span>
@@ -205,13 +234,13 @@
         </li>
         <li>
           <span>2</span>
-          <h3>Switch between views</h3>
-          <p>Browse the tree visually, check birthdays in calendar view, and explore places in globe view.</p>
+          <h3>Review the print layout</h3>
+          <p>Browse the tree visually, clean up labels, and prepare the layout you want to print.</p>
         </li>
         <li>
           <span>3</span>
-          <h3>Order a keepsake</h3>
-          <p>Pick a product, submit your details, and receive follow-up directly from the project rather than a generic checkout.</p>
+          <h3>Choose a print style</h3>
+          <p>Select your paper style, finish, and size, then submit the request to confirm by email.</p>
         </li>
       </ol>
     </section>
@@ -242,11 +271,11 @@
         </article>
         <article class="faq-item">
           <button type="button" class="faq-toggle" aria-expanded="false">
-            What does the store use from my tree?
+            What does the printed paper include?
             <span class="material-symbols-outlined" aria-hidden="true">expand_more</span>
           </button>
           <div class="faq-content">
-            <p>It uses the family data you already entered so keepsakes line up with the tree, birthdays, and places you maintain.</p>
+            <p>It uses the names, relationships, dates, and notes you already entered to generate a clean paper layout.</p>
           </div>
         </article>
       </div>
@@ -255,8 +284,8 @@
     <section class="landing-cta">
       <div class="landing-cta-copy">
         <p class="landing-kicker">Ready To Begin</p>
-        <h2>Start the family workspace now, order keepsakes when the story feels ready.</h2>
-        <p>Create your tree privately, explore the experience, and come back to the store when you want a finished object.</p>
+        <h2>Start the family workspace now, order a printed paper tree when the story feels ready.</h2>
+        <p>Create your tree privately, explore the experience, and come back to the store when you want a finished paper print.</p>
       </div>
       <div class="landing-hero-cta">
         <a href="pages/auth.html" class="landing-btn landing-btn-primary">Create Account</a>
@@ -269,9 +298,12 @@
     <div class="site-footer__inner">
       <p>&copy; <span data-site-footer-year></span> Ancestrio</p>
       <div class="site-footer__links">
-        <a href="pages/store.html?product=parchment&source=landing&view=tree">Store</a>
+        <a href="pages/store.html?product=paper-print&source=landing&view=tree">Store</a>
         <a href="pages/demo-tree.html">Demo</a>
         <a href="pages/contact.html">Contact</a>
+        <a href="pages/privacy.html">Privacy</a>
+        <a href="pages/terms.html">Terms</a>
+        <a href="pages/cookies.html">Cookies</a>
         <a
           href="https://github.com/PaulSuatean/paulsuatean.github.io"
           target="_blank"
@@ -294,20 +326,6 @@
   </script>
   <script src="scripts/theme-toggle.js"></script>
   <script src="scripts/landing.js"></script>
-  <script
-    type="text/plain"
-    data-consent="optional"
-    data-name="BMC-Widget"
-    data-cfasync="false"
-    data-src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js"
-    data-id="paulsuatean"
-    data-description="Support me on Buy me a coffee!"
-    data-message=""
-    data-color="#FFDD00"
-    data-position="Right"
-    data-x_margin="18"
-    data-y_margin="18"
-  ></script>
   <script src="scripts/cookie-consent.js"></script>
 </body>
 </html>

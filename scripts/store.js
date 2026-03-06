@@ -2,95 +2,45 @@
   const storeUtils = window.AncestrioStoreUtils || {};
   const PRODUCT_SKUS = Array.isArray(storeUtils.PRODUCT_SKUS)
     ? storeUtils.PRODUCT_SKUS
-    : ['parchment', 'calendar', 'globe', 'bundle'];
-  const SELECTABLE_PRODUCTS = ['parchment', 'calendar', 'globe'];
+    : ['paper-print'];
+  const SELECTABLE_PRODUCTS = ['paper-print'];
   const CURRENCY = storeUtils.STORE_CURRENCY || 'EUR';
   const EMAIL_PROVIDER_PLACEHOLDER = 'REPLACE_WITH_YOUR_FORM_ID';
   const FORMSPREE_HOST = 'formspree.io';
   const FORMSUBMIT_HOST = 'formsubmit.co';
 
   const PRODUCT_PRESENTATION = {
-    parchment: {
-      description: 'A premium parchment print that turns your family data into a wall-ready keepsake.',
+    'paper-print': {
+      description: 'A printed paper family tree designed for wall display and long-term keeping.',
       highlights: [
-        'Printed on archival matte paper.',
-        'Optimized layout for clear family branches.',
-        'Three visual styles available in the order form.'
+        'Choose from Classic, Ornate, or Minimal styles.',
+        'Pick a paper finish and size before printing.',
+        'Layout generated directly from your family tree.'
       ],
       gallery: [
         {
-          src: '../images/store/parchment.webp',
-          alt: 'Parchment family tree print laid on a wooden desk',
-          caption: 'Full print preview',
+          src: '../images/landing/print-01.webp',
+          alt: 'Classic printed family tree in a framed wall display',
+          caption: 'Classic Heritage',
           objectPosition: '50% 52%'
         },
         {
-          src: '../images/store/parchment.webp',
-          alt: 'Close-up of parchment texture and typography',
-          caption: 'Texture close-up',
-          objectPosition: '62% 38%'
-        },
-        {
-          src: '../images/store/parchment.webp',
-          alt: 'Parchment print styled with writing tools',
-          caption: 'Styled desk scene',
-          objectPosition: '40% 62%'
-        }
-      ]
-    },
-    calendar: {
-      description: 'A compact birthday calendar that keeps family dates visible all year.',
-      highlights: [
-        'Auto-filled from your family tree birthday data.',
-        'Clean monthly blocks for easy at-a-glance reading.',
-        'Sized for desks, kitchen counters, and planners.'
-      ],
-      gallery: [
-        {
-          src: '../images/store/calendar.webp',
-          alt: 'Mini birthday calendar pages on a desk',
-          caption: 'Calendar overview',
+          src: '../images/landing/print-02.webp',
+          alt: 'Ornate printed family tree with ceremonial framing',
+          caption: 'Gallery Ornate',
           objectPosition: '50% 50%'
         },
         {
-          src: '../images/store/calendar.webp',
-          alt: 'Calendar page close-up with date sections',
-          caption: 'Date detail view',
-          objectPosition: '56% 32%'
-        },
-        {
-          src: '../images/store/calendar.webp',
-          alt: 'Calendar print presented in a notebook setup',
-          caption: 'Desktop setup',
-          objectPosition: '44% 66%'
-        }
-      ]
-    },
-    globe: {
-      description: 'A display globe highlighting countries connected to your family story.',
-      highlights: [
-        'Based on places and migration data in your tree.',
-        'Designed as a compact keepsake display piece.',
-        'Readable markers for key family journey points.'
-      ],
-      gallery: [
-        {
-          src: '../images/store/globe.webp',
-          alt: 'Family journey globe with marked destinations',
-          caption: 'Globe preview',
+          src: '../images/landing/print-03.webp',
+          alt: 'Printed family tree featuring a colorful crest',
+          caption: 'Crest Edition',
           objectPosition: '50% 50%'
         },
         {
-          src: '../images/store/globe.webp',
-          alt: 'Close-up of the globe markers and country labels',
-          caption: 'Marker detail',
-          objectPosition: '60% 42%'
-        },
-        {
-          src: '../images/store/globe.webp',
-          alt: 'Decorative globe shown on a desk',
-          caption: 'Room context',
-          objectPosition: '42% 60%'
+          src: '../images/landing/print-04.webp',
+          alt: 'Minimal printed family tree on warm paper stock',
+          caption: 'Minimal Linework',
+          objectPosition: '50% 50%'
         }
       ]
     }
@@ -98,13 +48,13 @@
 
   let currentUser = null;
   let currentContext = {
-    product: 'parchment',
+    product: 'paper-print',
     source: 'dashboard',
     view: 'tree',
     treeId: '',
     treeName: ''
   };
-  let selectedProduct = 'parchment';
+  let selectedProduct = 'paper-print';
   let lastProductModalTrigger = null;
   let productPreviewGallery = [];
   let selectedPreviewIndex = 0;
@@ -125,7 +75,7 @@
     }
   }
 
-  function sanitizeProduct(value, fallback = 'parchment') {
+  function sanitizeProduct(value, fallback = 'paper-print') {
     if (typeof storeUtils.sanitizeProduct === 'function') {
       return storeUtils.sanitizeProduct(value, fallback);
     }
@@ -133,7 +83,7 @@
     return PRODUCT_SKUS.includes(normalized) ? normalized : fallback;
   }
 
-  function normalizeSelectableProduct(value, fallback = 'parchment') {
+  function normalizeSelectableProduct(value, fallback = 'paper-print') {
     const normalized = sanitizeProduct(value, fallback);
     return SELECTABLE_PRODUCTS.includes(normalized) ? normalized : fallback;
   }
@@ -269,7 +219,7 @@
     if (typeof storeUtils.parseStoreQuery === 'function') {
       const parsed = storeUtils.parseStoreQuery(window.location.search) || {};
       return {
-        product: normalizeSelectableProduct(parsed.product, 'parchment'),
+        product: normalizeSelectableProduct(parsed.product, 'paper-print'),
         source: sanitizeSource(parsed.source, 'dashboard'),
         view: sanitizeView(parsed.view, 'tree'),
         treeId: sanitizeTreeId(parsed.treeId),
@@ -279,7 +229,7 @@
 
     const params = new URLSearchParams(window.location.search);
     return {
-      product: normalizeSelectableProduct(params.get('product'), 'parchment'),
+      product: normalizeSelectableProduct(params.get('product'), 'paper-print'),
       source: sanitizeSource(params.get('source')),
       view: sanitizeView(params.get('view')),
       treeId: sanitizeTreeId(params.get('treeId')),
@@ -289,27 +239,25 @@
 
   function getProductBySku(sku) {
     if (typeof storeUtils.getProductBySku === 'function') {
-      const product = storeUtils.getProductBySku(normalizeSelectableProduct(sku, 'parchment'));
+      const product = storeUtils.getProductBySku(normalizeSelectableProduct(sku, 'paper-print'));
       if (product && SELECTABLE_PRODUCTS.includes(sanitizeProduct(product.sku, ''))) {
         return product;
       }
     }
 
     const fallbackProducts = {
-      parchment: { sku: 'parchment', label: 'Printed Parchment Family Tree', shortLabel: 'Parchment Print', price: 69 },
-      calendar: { sku: 'calendar', label: 'Mini Birthday Calendar', shortLabel: 'Birthday Calendar', price: 24 },
-      globe: { sku: 'globe', label: 'Family Journey Globe', shortLabel: 'Family Globe', price: 79 }
+      'paper-print': { sku: 'paper-print', label: 'Printed Paper Family Tree', shortLabel: 'Paper Print', price: 69 }
     };
-    return fallbackProducts[normalizeSelectableProduct(sku, 'parchment')];
+    return fallbackProducts[normalizeSelectableProduct(sku, 'paper-print')];
   }
 
   function getProductPresentation(sku) {
-    const safeSku = normalizeSelectableProduct(sku, 'parchment');
-    return PRODUCT_PRESENTATION[safeSku] || PRODUCT_PRESENTATION.parchment;
+    const safeSku = normalizeSelectableProduct(sku, 'paper-print');
+    return PRODUCT_PRESENTATION[safeSku] || PRODUCT_PRESENTATION['paper-print'];
   }
 
   function getProductPricing(sku, quantity) {
-    const safeSku = normalizeSelectableProduct(sku, 'parchment');
+    const safeSku = normalizeSelectableProduct(sku, 'paper-print');
     if (typeof storeUtils.getProductPricing === 'function') {
       return storeUtils.getProductPricing(safeSku, quantity);
     }
@@ -336,18 +284,32 @@
     return `${amount.toFixed(2)} ${CURRENCY}`;
   }
 
-  function isAllowedParchmentStyle(style) {
-    if (typeof storeUtils.isAllowedParchmentStyle === 'function') {
-      return storeUtils.isAllowedParchmentStyle(style);
+  function isAllowedPrintStyle(style) {
+    if (typeof storeUtils.isAllowedPrintStyle === 'function') {
+      return storeUtils.isAllowedPrintStyle(style);
     }
-    return ['Classic', 'Minimal', 'Vintage'].includes(sanitizeText(style, 32));
+    return ['Classic', 'Ornate', 'Minimal'].includes(sanitizeText(style, 32));
+  }
+
+  function isAllowedPaperFinish(finish) {
+    if (typeof storeUtils.isAllowedPaperFinish === 'function') {
+      return storeUtils.isAllowedPaperFinish(finish);
+    }
+    return ['Matte', 'Satin', 'Gloss'].includes(sanitizeText(finish, 32));
+  }
+
+  function isAllowedPrintSize(size) {
+    if (typeof storeUtils.isAllowedPrintSize === 'function') {
+      return storeUtils.isAllowedPrintSize(size);
+    }
+    return ['A3', 'A2', 'Custom'].includes(sanitizeText(size, 32));
   }
 
   function buildStoreUrl(overrides = {}) {
     const payload = {
       ...currentContext,
       ...overrides,
-      product: normalizeSelectableProduct(overrides.product || selectedProduct, 'parchment')
+      product: normalizeSelectableProduct(overrides.product || selectedProduct, 'paper-print')
     };
 
     if (typeof storeUtils.buildStoreUrl === 'function') {
@@ -355,7 +317,7 @@
     }
 
     const params = new URLSearchParams();
-    params.set('product', normalizeSelectableProduct(payload.product, 'parchment'));
+    params.set('product', normalizeSelectableProduct(payload.product, 'paper-print'));
     params.set('source', sanitizeSource(payload.source));
     params.set('view', sanitizeView(payload.view));
     if (payload.treeId) params.set('treeId', sanitizeTreeId(payload.treeId));
@@ -406,22 +368,18 @@
     });
   }
 
-  function updateParchmentStyleVisibility() {
-    if (!refs.parchmentStyleGroup) return;
-    refs.parchmentStyleGroup.style.display = selectedProduct === 'parchment' ? 'block' : 'none';
+  function updatePrintStyleVisibility() {
+    if (!refs.printStyleGroup) return;
+    refs.printStyleGroup.style.display = 'block';
   }
 
   function updateSelectedProductSummary() {
     if (!refs.selectedProductSummary) return;
     const product = getProductBySku(selectedProduct);
-    if (selectedProduct === 'parchment') {
-      const hasStyleSelector = refs.parchmentStyle instanceof HTMLSelectElement;
-      refs.selectedProductSummary.textContent = hasStyleSelector
-        ? `${product.label}: choose your preferred style and submit your order.`
-        : `${product.label}: confirm your details and submit your order.`;
-      return;
-    }
-    refs.selectedProductSummary.textContent = `${product.label}: confirm your details and submit your order.`;
+    const hasStyleSelector = refs.printStyle instanceof HTMLSelectElement;
+    refs.selectedProductSummary.textContent = hasStyleSelector
+      ? `${product.label}: choose your style, finish, and size before submitting.`
+      : `${product.label}: confirm your details and submit your order.`;
   }
 
   function readQuantity() {
@@ -735,7 +693,7 @@
   }
 
   function setSelectedProduct(nextProduct, options = {}) {
-    const safeProduct = normalizeSelectableProduct(nextProduct, 'parchment');
+    const safeProduct = normalizeSelectableProduct(nextProduct, 'paper-print');
     const shouldSyncSelect = options.syncSelect !== false;
     const shouldUpdateUrl = options.updateUrl !== false;
     selectedProduct = safeProduct;
@@ -745,7 +703,7 @@
     }
 
     syncSelectedProductCards();
-    updateParchmentStyleVisibility();
+    updatePrintStyleVisibility();
     updateSelectedProductSummary();
     updatePriceSummary();
 
@@ -761,8 +719,8 @@
   }
 
   function focusOrderPageStart() {
-    if (selectedProduct === 'parchment' && refs.parchmentStyle instanceof HTMLElement) {
-      refs.parchmentStyle.focus();
+    if (refs.printStyle instanceof HTMLElement) {
+      refs.printStyle.focus();
       return;
     }
     refs.contactName?.focus();
@@ -900,7 +858,7 @@
     const product = getProductBySku(sku);
     return [
       {
-        src: `../images/store/${normalizeSelectableProduct(sku, 'parchment')}.webp`,
+        src: '../images/landing/print-01.webp',
         alt: `${product.label} preview`,
         caption: 'Preview',
         objectPosition: '50% 50%'
@@ -942,9 +900,11 @@
   }
 
   function mountStoreModalInline() {
-    if (!refs.storeProductsSection || !refs.storeProductModal) return;
-    if (refs.storeProductModal.parentElement !== refs.storeProductsSection) {
-      refs.storeProductsSection.appendChild(refs.storeProductModal);
+    if (!refs.storeProductModal) return;
+    const host = refs.productGrid || refs.storeProductsSection;
+    if (!host) return;
+    if (refs.storeProductModal.parentElement !== host) {
+      host.appendChild(refs.storeProductModal);
     }
   }
 
@@ -1012,8 +972,9 @@
     const note = sanitizeText(refs.orderNote?.value, 500);
     const quantity = readQuantity();
     const product = normalizeSelectableProduct(refs.orderProduct?.value, selectedProduct);
-    const hasParchmentStyleField = refs.parchmentStyle instanceof HTMLSelectElement;
-    const parchmentStyle = sanitizeText(hasParchmentStyleField ? refs.parchmentStyle.value : 'Classic', 32);
+    const printStyle = sanitizeText(refs.printStyle?.value, 32);
+    const paperFinish = sanitizeText(refs.paperFinish?.value, 32);
+    const printSize = sanitizeText(refs.printSize?.value, 32);
 
     if (!contactName) {
       notifyUser('Contact name is required.', 'warning');
@@ -1063,9 +1024,21 @@
       return null;
     }
 
-    if (product === 'parchment' && hasParchmentStyleField && !isAllowedParchmentStyle(parchmentStyle)) {
-      notifyUser('Choose a valid parchment style.', 'warning');
-      refs.parchmentStyle?.focus();
+    if (!isAllowedPrintStyle(printStyle)) {
+      notifyUser('Choose a valid print style.', 'warning');
+      refs.printStyle?.focus();
+      return null;
+    }
+
+    if (!isAllowedPaperFinish(paperFinish)) {
+      notifyUser('Choose a valid paper finish.', 'warning');
+      refs.paperFinish?.focus();
+      return null;
+    }
+
+    if (!isAllowedPrintSize(printSize)) {
+      notifyUser('Choose a valid print size.', 'warning');
+      refs.printSize?.focus();
       return null;
     }
 
@@ -1082,7 +1055,9 @@
       note,
       quantity,
       product,
-      parchmentStyle
+      printStyle,
+      paperFinish,
+      printSize
     };
   }
 
@@ -1116,6 +1091,7 @@
     const subject = `New store order: ${sanitizeText(order.productLabel, 80)} x${order.quantity}`;
     const contextLine = `Source: ${order.context.source} | View: ${order.context.view} | Tree: ${order.context.treeName || order.context.treeId || 'N/A'}`;
     const noteLine = order.note || 'No note provided';
+    const styleLine = `Style: ${order.options.printStyle || 'N/A'} | Finish: ${order.options.paperFinish || 'N/A'} | Size: ${order.options.printSize || 'N/A'}`;
 
     const fields = {
       _subject: subject,
@@ -1129,6 +1105,9 @@
       product: order.productLabel,
       product_sku: order.productSku,
       quantity: String(order.quantity),
+      print_style: order.options.printStyle || 'N/A',
+      paper_finish: order.options.paperFinish || 'N/A',
+      print_size: order.options.printSize || 'N/A',
       unit_price: formatCurrency(order.unitPrice),
       subtotal: formatCurrency(order.subtotal),
       discount: formatCurrency(order.discountAmount),
@@ -1145,6 +1124,7 @@
         `Phone: ${order.contactPhone}`,
         `Product: ${order.productLabel}`,
         `Quantity: ${order.quantity}`,
+        styleLine,
         `Total: ${formatCurrency(order.total)}`,
         `Shipping address: ${shippingAddress}`,
         `Note: ${noteLine}`,
@@ -1243,6 +1223,9 @@
     if (refs.orderNote) refs.orderNote.value = '';
     if (refs.shippingAddress2) refs.shippingAddress2.value = '';
     if (refs.orderQuantity) refs.orderQuantity.value = '1';
+    if (refs.printStyle) refs.printStyle.value = 'Classic';
+    if (refs.paperFinish) refs.paperFinish.value = 'Matte';
+    if (refs.printSize) refs.printSize.value = 'A3';
     updatePriceSummary();
     prefillContactFromUser();
   }
@@ -1272,10 +1255,11 @@
       const view = sanitizeView(currentContext.view, 'tree');
       const treeId = sanitizeTreeId(currentContext.treeId);
       const treeName = sanitizeText(currentContext.treeName, 160);
-      const options = {};
-      if (payload.product === 'parchment') {
-        options.parchmentStyle = payload.parchmentStyle;
-      }
+      const options = {
+        printStyle: payload.printStyle,
+        paperFinish: payload.paperFinish,
+        printSize: payload.printSize
+      };
 
       const order = {
         contactName: payload.contactName,
@@ -1470,8 +1454,10 @@
   function initializeRefs() {
     refs.orderForm = document.getElementById('orderForm');
     refs.orderProduct = document.getElementById('orderProduct');
-    refs.parchmentStyleGroup = document.getElementById('parchmentStyleGroup');
-    refs.parchmentStyle = document.getElementById('parchmentStyle');
+    refs.printStyleGroup = document.getElementById('printStyleGroup');
+    refs.printStyle = document.getElementById('printStyle');
+    refs.paperFinish = document.getElementById('paperFinish');
+    refs.printSize = document.getElementById('printSize');
     refs.contactName = document.getElementById('contactName');
     refs.contactEmail = document.getElementById('contactEmail');
     refs.contactPhone = document.getElementById('contactPhone');
@@ -1517,6 +1503,7 @@
     refs.orderPageBackBtn = document.getElementById('orderPageBackBtn');
     refs.selectedProductSummary = document.getElementById('selectedProductSummary');
 
+    refs.productGrid = document.getElementById('productGrid');
     refs.storeProductsSection = document.querySelector('.store-products');
   }
 
@@ -1527,7 +1514,7 @@
     setCatalogPrices();
 
     currentContext = parseContextFromQuery();
-    selectedProduct = normalizeSelectableProduct(currentContext.product, 'parchment');
+    selectedProduct = normalizeSelectableProduct(currentContext.product, 'paper-print');
     bindProductCards();
     bindModalEvents();
     bindEvents();

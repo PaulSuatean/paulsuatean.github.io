@@ -33,7 +33,7 @@
       <nav class="site-header__nav" id="siteNav" aria-label="Primary">
         <a href="../index.html">Home</a>
         <a href="demo-tree.html">Demo</a>
-        <a href="store.html?product=parchment&source=site-header&view=tree">Store</a>
+        <a href="store.html?product=paper-print&source=site-header&view=tree">Store</a>
         <a href="contact.html">Contact</a>
       </nav>
       <div class="site-header__actions">
@@ -117,6 +117,10 @@
             <div class="visual-editor">
               <div class="visual-toolbar">
                 <div class="visual-toolbar-group">
+                  <button class="tool-btn tool-btn-style-toggle" id="visualStyleToggle" type="button" aria-label="Toggle style panel" aria-controls="editorStylePanel" aria-expanded="false" aria-pressed="false">
+                    <span class="material-symbols-outlined">palette</span>
+                    Styles
+                  </button>
                   <button class="tool-btn" id="visualZoomIn" type="button" aria-label="Zoom in">
                     <span class="material-symbols-outlined">add</span>
                     Zoom In
@@ -133,6 +137,16 @@
                 <div class="visual-toolbar-hint" id="visualHint">Click + on a member to add Parent, Spouse, or Child.</div>
               </div>
               <div class="visual-canvas" id="visualCanvas">
+                <aside class="editor-style-panel" id="editorStylePanel" aria-label="Tree style settings" hidden>
+                  <div class="editor-style-group">
+                    <p class="editor-style-group-title">Background</p>
+                    <div id="editorViewBackgroundOptions" class="editor-style-options" role="radiogroup" aria-label="Editor background style"></div>
+                  </div>
+                  <div class="editor-style-group">
+                    <p class="editor-style-group-title">Bubbles</p>
+                    <div id="editorViewBubbleOptions" class="editor-style-options" role="radiogroup" aria-label="Editor bubble style"></div>
+                  </div>
+                </aside>
                 <svg id="visualTree" tabindex="0" aria-label="Family tree editor canvas" role="img"></svg>
               </div>
             </div>
@@ -349,7 +363,8 @@
   <script src="../scripts/dom-display.js"></script>
   <script src="../scripts/firebase-config.js?v=5"></script>
   <script src="../scripts/site-header.js?v=6"></script>
-  <script src="../scripts/editor.js?v=4"></script>
+  <script src="../scripts/main/view-style-ui.js?v=1"></script>
+  <script src="../scripts/editor.js?v=5"></script>
   <script
     type="text/plain"
     data-consent="optional"

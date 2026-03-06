@@ -32,7 +32,7 @@
       <nav class="site-header__nav" id="siteNav" aria-label="Primary">
         <a href="../index.html">Home</a>
         <a href="demo-tree.html">Demo</a>
-        <a href="store.html?product=parchment&source=site-header&view=tree">Store</a>
+        <a href="store.html?product=paper-print&source=site-header&view=tree">Store</a>
         <a href="contact.html">Contact</a>
       </nav>
       <div class="site-header__actions">
@@ -110,7 +110,21 @@
                 <input type="password" class="form-input" id="loginPassword" required autocomplete="current-password" />
               </div>
               <button type="submit" class="form-button">Login</button>
+              <button type="button" class="auth-reset-toggle" id="passwordResetToggle" aria-expanded="false" aria-controls="passwordResetPanel">Forgot password?</button>
             </form>
+
+            <div class="auth-reset" id="passwordResetPanel" aria-hidden="true">
+              <div class="auth-reset-header">
+                <p class="auth-reset-kicker">Password Reset</p>
+                <p class="auth-reset-copy">Enter the email address linked to your account. Usernames cannot receive reset links.</p>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="resetEmail">Account Email</label>
+                <input type="email" class="form-input" id="resetEmail" autocomplete="email" />
+              </div>
+              <button type="button" class="form-button auth-reset-submit" id="resetSubmitBtn">Send Reset Link</button>
+              <button type="button" class="auth-reset-back" id="passwordResetBack">Back to login</button>
+            </div>
 
             <form class="auth-form" id="signupForm">
               <div class="signup-row">
@@ -168,9 +182,12 @@
     <div class="site-footer__inner">
       <p>&copy; <span data-site-footer-year></span> Ancestrio</p>
       <div class="site-footer__links">
-        <a href="store.html?product=parchment&source=auth-footer&view=tree">Store</a>
+        <a href="store.html?product=paper-print&source=auth-footer&view=tree">Store</a>
         <a href="demo-tree.html">Demo</a>
         <a href="contact.html">Contact</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="terms.html">Terms</a>
+        <a href="cookies.html">Cookies</a>
         <a
           href="https://github.com/PaulSuatean/paulsuatean.github.io"
           target="_blank"

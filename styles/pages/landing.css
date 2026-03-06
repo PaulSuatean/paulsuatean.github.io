@@ -159,6 +159,155 @@ main > section {
   align-content: start;
 }
 
+.landing-hero-carousel {
+  padding: clamp(16px, 3vw, 24px);
+  border-radius: calc(var(--radius-xl) + 8px);
+  border: 1px solid var(--shell-panel-border-strong);
+  background: var(--shell-panel-bg-strong);
+  box-shadow: var(--shadow-lg);
+  grid-template-rows: none;
+  height: auto;
+  align-self: start;
+}
+
+.carousel {
+  display: grid;
+  gap: 14px;
+}
+
+.carousel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.carousel-kicker {
+  margin: 0;
+  color: color-mix(in srgb, var(--accent) 74%, var(--text) 26%);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.carousel-controls {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.carousel-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid var(--shell-panel-border);
+  background: var(--shell-field-bg);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    transform var(--transition-base) ease,
+    box-shadow var(--transition-base) ease,
+    border-color var(--transition-base) ease;
+}
+
+.carousel-btn:hover,
+.carousel-btn:focus-visible {
+  outline: none;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line) 60%);
+}
+
+.carousel-viewport {
+  position: relative;
+  overflow: hidden;
+  border-radius: calc(var(--radius-lg) + 4px);
+  background: var(--shell-row-bg);
+}
+
+.carousel-track {
+  display: flex;
+  transition: transform var(--transition-base) ease;
+  will-change: transform;
+}
+
+.carousel-slide {
+  position: relative;
+  min-width: 100%;
+  aspect-ratio: 4 / 3;
+  display: flex;
+  align-items: stretch;
+}
+
+.carousel-slide img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.carousel-caption {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(16, 18, 20, 0.6);
+  color: #ffffff;
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(6px);
+}
+
+.carousel-style {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.carousel-title {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  letter-spacing: 0.01em;
+}
+
+.carousel-dots {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.carousel-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  border: 1px solid var(--shell-panel-border);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    transform var(--transition-base) ease,
+    background var(--transition-base) ease,
+    border-color var(--transition-base) ease;
+}
+
+.carousel-dot:hover,
+.carousel-dot:focus-visible {
+  outline: none;
+  transform: scale(1.1);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line) 60%);
+}
+
+.carousel-dot.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
 .hero-stage-card {
   padding: 18px;
   border-radius: calc(var(--radius-xl) + 2px);
@@ -423,6 +572,42 @@ main > section {
   outline: none;
 }
 
+.landing-ordering-strip {
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 18px;
+  padding: 18px;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--shell-panel-border);
+  background: var(--shell-panel-bg);
+  box-shadow: var(--shadow-sm);
+}
+
+.landing-ordering-strip h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 2.6vw, 2.2rem);
+  line-height: 1.1;
+  color: var(--text);
+}
+
+.landing-ordering-strip p {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.landing-ordering-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
+  color: var(--text);
+  font-weight: 700;
+  line-height: 1.6;
+}
+
 .landing-features {
   display: grid;
   gap: 22px;
@@ -597,6 +782,14 @@ main > section {
   line-height: 1.7;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .carousel-track,
+  .carousel-btn,
+  .carousel-dot {
+    transition: none;
+  }
+}
+
 body.theme-dark.landing-page {
   --shell-page-bg:
     radial-gradient(circle at 12% 8%, rgba(108, 179, 172, 0.16), transparent 30%),
@@ -609,8 +802,10 @@ body.theme-dark .proof-card,
 body.theme-dark .product-card,
 body.theme-dark .feature-card,
 body.theme-dark .landing-products,
+body.theme-dark .landing-ordering-strip,
 body.theme-dark .landing-faq,
 body.theme-dark .landing-cta,
+body.theme-dark .landing-hero-carousel,
 body.theme-dark .hero-stage-card--tree,
 body.theme-dark .hero-stage-card--keepsake {
   background: var(--shell-panel-bg);
@@ -627,6 +822,12 @@ body.theme-dark .faq-item {
     grid-template-rows: minmax(260px, auto) minmax(0, 1fr) minmax(0, 1fr);
     align-content: stretch;
     height: 100%;
+  }
+
+  .landing-hero-carousel {
+    grid-template-rows: none;
+    align-content: start;
+    height: auto;
   }
 
   .hero-stage-card {
@@ -646,6 +847,7 @@ body.theme-dark .faq-item {
   .landing-proof,
   .feature-grid,
   .product-cards,
+  .landing-ordering-strip,
   .steps-list {
     grid-template-columns: 1fr;
   }
@@ -679,5 +881,10 @@ body.theme-dark .faq-item {
 
   .landing-btn {
     width: 100%;
+  }
+
+  .carousel-caption {
+    left: 12px;
+    right: 12px;
   }
 }

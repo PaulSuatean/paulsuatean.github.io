@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Ancestrio Store</title>
-  <meta name="description" content="Order printed keepsakes from your family tree data." />
+  <meta name="description" content="Order printed paper family trees built from your family workspace." />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -34,7 +34,7 @@
       <nav class="site-header__nav" id="siteNav" aria-label="Primary">
         <a href="../index.html">Home</a>
         <a href="demo-tree.html">Demo</a>
-        <a href="store.html?product=parchment&source=site-header&view=tree" aria-current="page">Store</a>
+        <a href="store.html?product=paper-print&source=site-header&view=tree" aria-current="page">Store</a>
         <a href="contact.html">Contact</a>
       </nav>
       <div class="site-header__actions">
@@ -50,10 +50,10 @@
   <main class="page-container store-main">
     <section class="store-hero page-hero">
       <div class="store-hero-copy">
-        <p class="store-kicker page-kicker">Keepsake Store</p>
-        <h1 class="page-title">Order family objects that come directly from the workspace.</h1>
+        <p class="store-kicker page-kicker">Printed Paper Store</p>
+        <h1 class="page-title">Order a printed paper family tree built from your workspace.</h1>
         <p class="store-subtitle page-subtitle">
-          Choose a keepsake, review the details, and submit your order request in one flow. This page captures interest and delivery details in v1. It does not process online payment.
+          Review the style, paper finish, and size, then submit your order request in one flow. This page captures interest and delivery details in v1. It does not process online payment.
         </p>
         <div class="store-hero-actions">
           <a id="storeBackBtn" class="site-btn site-btn--secondary" href="dashboard.html">Back</a>
@@ -64,16 +64,16 @@
         <div class="store-hero-note">
           <p class="store-hero-note-label">What You Can Order</p>
           <ul>
-            <li>Parchment family tree print</li>
-            <li>Birthday calendar</li>
-            <li>Family journey globe</li>
+            <li>Printed paper family tree</li>
+            <li>Classic, Ornate, or Minimal style</li>
+            <li>Matte, Satin, or Gloss finish</li>
           </ul>
         </div>
         <div class="store-hero-note">
           <p class="store-hero-note-label">How It Works</p>
           <ol>
-            <li>Open a product</li>
-            <li>Review details</li>
+            <li>Open the print</li>
+            <li>Choose style and size</li>
             <li>Submit your request</li>
           </ol>
         </div>
@@ -104,71 +104,44 @@
       </article>
     </section>
 
+    <section class="store-ordering-details surface-card" aria-label="Ordering details">
+      <div>
+        <p class="store-kicker page-kicker">Ordering Details</p>
+        <h2>Submit a request, then confirm the print by email.</h2>
+        <p>Choose the paper finish and size, then approve the proof and delivery timeline before printing.</p>
+      </div>
+      <ul class="store-ordering-list">
+        <li>Paper finishes: Matte, Satin, Gloss.</li>
+        <li>Sizes: A3, A2, or Custom.</li>
+        <li>Email confirmation includes proof and delivery timeline.</li>
+      </ul>
+    </section>
+
     <div class="store-layout">
       <section class="store-products surface-card" aria-labelledby="productsHeading">
         <div class="store-products-intro">
           <div>
-            <h2 id="productsHeading">Choose Your Keepsake</h2>
-            <p class="store-products-subtitle">Select a product to open details and continue directly into the order form.</p>
+            <h2 id="productsHeading">Printed Paper Family Tree</h2>
+            <p class="store-products-subtitle">Open the details to review styles and submit your request.</p>
           </div>
           <p class="store-help-note">Product details and ordering stay in this panel so the flow feels continuous.</p>
         </div>
 
         <div class="product-grid" id="productGrid">
-          <article class="store-product-card" data-product="parchment" aria-label="Printed Parchment Family Tree">
+          <article class="store-product-card" data-product="paper-print" aria-label="Printed Paper Family Tree">
             <div class="product-photo-wrap">
               <img
                 class="product-photo"
-                src="../images/store/parchment.webp"
-                alt="Parchment sheet and fountain pen on a wooden desk"
+                src="../images/landing/print-01.webp"
+                alt="Printed paper family tree on a wall"
                 loading="lazy"
               />
             </div>
             <div class="store-product-card-copy">
-              <p class="store-product-card-kicker">Wall keepsake</p>
-              <h3>Printed Parchment Family Tree</h3>
-              <p>Choose one style and turn your family structure into an heirloom-style print.</p>
-              <p class="product-price" data-price="parchment"></p>
-              <div class="product-card-actions">
-                <button type="button" class="product-cta" data-product-action="preview">View details</button>
-              </div>
-            </div>
-          </article>
-
-          <article class="store-product-card" data-product="calendar" aria-label="Mini Birthday Calendar">
-            <div class="product-photo-wrap">
-              <img
-                class="product-photo"
-                src="../images/store/calendar.webp"
-                alt="Desk planner and calendar pages ready for notes"
-                loading="lazy"
-              />
-            </div>
-            <div class="store-product-card-copy">
-              <p class="store-product-card-kicker">Desk format</p>
-              <h3>Mini Birthday Calendar</h3>
-              <p>Compact monthly calendar pages built from birthdays already stored in the workspace.</p>
-              <p class="product-price" data-price="calendar"></p>
-              <div class="product-card-actions">
-                <button type="button" class="product-cta" data-product-action="preview">View details</button>
-              </div>
-            </div>
-          </article>
-
-          <article class="store-product-card" data-product="globe" aria-label="Family Journey Globe">
-            <div class="product-photo-wrap">
-              <img
-                class="product-photo"
-                src="../images/store/globe.webp"
-                alt="Travel globe with marked destinations"
-                loading="lazy"
-              />
-            </div>
-            <div class="store-product-card-copy">
-              <p class="store-product-card-kicker">Shelf object</p>
-              <h3>Family Journey Globe</h3>
-              <p>Highlight countries connected to family movement, travel, and story in a compact display piece.</p>
-              <p class="product-price" data-price="globe"></p>
+              <p class="store-product-card-kicker">Paper print</p>
+              <h3>Printed Paper Family Tree</h3>
+              <p>Choose a style, paper finish, and size for a wall-ready family tree.</p>
+              <p class="product-price" data-price="paper-print"></p>
               <div class="product-card-actions">
                 <button type="button" class="product-cta" data-product-action="preview">View details</button>
               </div>
@@ -195,9 +168,12 @@
     <div class="site-footer__inner">
       <p>&copy; <span data-site-footer-year></span> Ancestrio</p>
       <div class="site-footer__links">
-        <a href="store.html?product=parchment&source=store-footer&view=tree" aria-current="page">Store</a>
+        <a href="store.html?product=paper-print&source=store-footer&view=tree" aria-current="page">Store</a>
         <a href="demo-tree.html">Demo</a>
         <a href="contact.html">Contact</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="terms.html">Terms</a>
+        <a href="cookies.html">Cookies</a>
         <a
           href="https://github.com/PaulSuatean/paulsuatean.github.io"
           target="_blank"
@@ -219,7 +195,7 @@
                 <img
                   id="productPreviewImage"
                   class="store-preview-image"
-                  src="../images/store/parchment.webp"
+                  src="../images/landing/print-01.webp"
                   alt="Product preview"
                 />
                 <figcaption class="store-preview-caption" id="productPreviewCaption"></figcaption>
@@ -227,8 +203,8 @@
               <div class="store-preview-thumbs" id="productPreviewThumbs" aria-label="Product photos"></div>
             </div>
             <div class="store-product-info">
-              <p class="store-modal-kicker">Keepsake Details</p>
-              <h2 id="productPreviewHeading">Printed Parchment Family Tree</h2>
+              <p class="store-modal-kicker">Print Details</p>
+              <h2 id="productPreviewHeading">Printed Paper Family Tree</h2>
               <p class="store-product-preview-price" id="productPreviewPrice"></p>
               <p class="store-modal-subtitle" id="productPreviewDescription"></p>
               <ul class="store-product-highlights" id="productPreviewHighlights"></ul>
@@ -265,23 +241,37 @@
                   <section class="order-form-section">
                     <h3>Product</h3>
                     <div class="form-group">
-                      <label class="form-label" for="orderProduct">Keepsake</label>
+                      <label class="form-label" for="orderProduct">Product</label>
                       <select class="form-input" id="orderProduct">
-                        <option value="parchment">Printed Parchment Family Tree</option>
-                        <option value="calendar">Mini Birthday Calendar</option>
-                        <option value="globe">Family Journey Globe</option>
+                        <option value="paper-print">Printed Paper Family Tree</option>
                       </select>
                     </div>
                     <div class="form-group form-group-compact">
                       <label class="form-label" for="orderQuantity">Quantity</label>
                       <input class="form-input" id="orderQuantity" type="number" min="1" max="999" value="1" required />
                     </div>
-                    <div class="form-group form-group-wide" id="parchmentStyleGroup">
-                      <label class="form-label" for="parchmentStyle">Parchment Style</label>
-                      <select class="form-input" id="parchmentStyle">
+                    <div class="form-group form-group-wide" id="printStyleGroup">
+                      <label class="form-label" for="printStyle">Print Style</label>
+                      <select class="form-input" id="printStyle">
                         <option value="Classic">Classic</option>
+                        <option value="Ornate">Ornate</option>
                         <option value="Minimal">Minimal</option>
-                        <option value="Vintage">Vintage</option>
+                      </select>
+                    </div>
+                    <div class="form-group form-group-wide">
+                      <label class="form-label" for="paperFinish">Paper Finish</label>
+                      <select class="form-input" id="paperFinish">
+                        <option value="Matte">Matte</option>
+                        <option value="Satin">Satin</option>
+                        <option value="Gloss">Gloss</option>
+                      </select>
+                    </div>
+                    <div class="form-group form-group-wide">
+                      <label class="form-label" for="printSize">Print Size</label>
+                      <select class="form-input" id="printSize">
+                        <option value="A3">A3</option>
+                        <option value="A2">A2</option>
+                        <option value="Custom">Custom</option>
                       </select>
                     </div>
                   </section>
@@ -302,7 +292,7 @@
                     </div>
                   </section>
 
-                  <section class="order-form-section">
+                  <section class="order-form-section order-form-section--wide">
                     <h3>Shipping</h3>
                     <div class="form-group form-group-wide">
                       <label class="form-label" for="shippingAddress1">Address Line 1</label>
@@ -330,7 +320,7 @@
                     </div>
                   </section>
 
-                  <section class="order-form-section">
+                  <section class="order-form-section order-form-section--wide">
                     <h3>Notes</h3>
                     <div class="form-group form-group-wide">
                       <label class="form-label" for="orderNote">Note (Optional)</label>
@@ -381,20 +371,6 @@
   <script src="../scripts/firebase-config.js?v=5"></script>
   <script src="../scripts/store-utils.js"></script>
   <script src="../scripts/store.js"></script>
-  <script
-    type="text/plain"
-    data-consent="optional"
-    data-name="BMC-Widget"
-    data-cfasync="false"
-    data-src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js"
-    data-id="paulsuatean"
-    data-description="Support me on Buy me a coffee!"
-    data-message=""
-    data-color="#FFDD00"
-    data-position="Right"
-    data-x_margin="18"
-    data-y_margin="18"
-  ></script>
   <script src="../scripts/cookie-consent.js"></script>
 </body>
 </html>

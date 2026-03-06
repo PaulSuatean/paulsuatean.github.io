@@ -10,10 +10,7 @@ service cloud.firestore {
     }
 
     function isAllowedProductSku(value) {
-      return value == "parchment" ||
-             value == "calendar" ||
-             value == "globe" ||
-             value == "bundle";
+      return value == "paper-print";
     }
 
     function isAllowedSource(value) {
@@ -29,19 +26,36 @@ service cloud.firestore {
              value == "globe";
     }
 
-    function isAllowedParchmentStyle(value) {
+    function isAllowedPrintStyle(value) {
       return value == "Classic" ||
-             value == "Minimal" ||
-             value == "Vintage";
+             value == "Ornate" ||
+             value == "Minimal";
+    }
+
+    function isAllowedPaperFinish(value) {
+      return value == "Matte" ||
+             value == "Satin" ||
+             value == "Gloss";
+    }
+
+    function isAllowedPrintSize(value) {
+      return value == "A3" ||
+             value == "A2" ||
+             value == "Custom";
     }
 
     function isValidOrderOptions(options, productSku) {
       return options is map &&
-             options.keys().hasOnly(["parchmentStyle"]) &&
+             options.keys().hasOnly(["printStyle", "paperFinish", "printSize"]) &&
              (
-               productSku == "parchment"
-                 ? ("parchmentStyle" in options && isAllowedParchmentStyle(options.parchmentStyle))
-                 : !("parchmentStyle" in options)
+               productSku == "paper-print"
+                 ? ("printStyle" in options &&
+                    "paperFinish" in options &&
+                    "printSize" in options &&
+                    isAllowedPrintStyle(options.printStyle) &&
+                    isAllowedPaperFinish(options.paperFinish) &&
+                    isAllowedPrintSize(options.printSize))
+                 : false
              );
     }
 
@@ -57,15 +71,11 @@ service cloud.firestore {
     }
 
     function hasValidUnitPrice(productSku, unitPrice) {
-      return (productSku == "parchment" && unitPrice == 69) ||
-             (productSku == "calendar" && unitPrice == 24) ||
-             (productSku == "globe" && unitPrice == 79) ||
-             (productSku == "bundle" && unitPrice == 172);
+      return (productSku == "paper-print" && unitPrice == 69);
     }
 
     function hasValidDiscountPercent(productSku, discountPercent) {
-      return (productSku == "bundle" && discountPercent == 10) ||
-             (productSku != "bundle" && discountPercent == 0);
+      return discountPercent == 0;
     }
 
     function isValidShippingAddress(address) {
@@ -196,7 +206,10 @@ service cloud.firestore {
       allow read: if request.auth != null &&
                      resource.data.userId == request.auth.uid;
 
-      allow update, delete: if false;
+      allow update: if false;
+
+      allow delete: if request.auth != null &&
+                       resource.data.userId == request.auth.uid;
     }
   }
 }

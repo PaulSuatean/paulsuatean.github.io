@@ -1,41 +1,20 @@
 (function (global) {
   const STORE_CURRENCY = 'EUR';
-  const BUNDLE_DISCOUNT_PERCENT = 10;
-  const PRODUCT_SKUS = ['parchment', 'calendar', 'globe', 'bundle'];
+  const PRODUCT_SKUS = ['paper-print'];
   const SOURCE_VALUES = ['landing', 'dashboard', 'tree', 'demo-tree'];
   const VIEW_VALUES = ['tree', 'calendar', 'globe'];
-  const PARCHMENT_STYLES = ['Classic', 'Minimal', 'Vintage'];
+  const PRINT_STYLES = ['Classic', 'Ornate', 'Minimal'];
+  const PAPER_FINISHES = ['Matte', 'Satin', 'Gloss'];
+  const PRINT_SIZES = ['A3', 'A2', 'Custom'];
 
   const STORE_PRODUCTS = {
-    parchment: {
-      sku: 'parchment',
-      label: 'Printed Parchment Family Tree',
-      shortLabel: 'Parchment Print',
+    'paper-print': {
+      sku: 'paper-print',
+      label: 'Printed Paper Family Tree',
+      shortLabel: 'Paper Print',
       price: 69
-    },
-    calendar: {
-      sku: 'calendar',
-      label: 'Mini Birthday Calendar',
-      shortLabel: 'Birthday Calendar',
-      price: 24
-    },
-    globe: {
-      sku: 'globe',
-      label: 'Family Journey Globe',
-      shortLabel: 'Family Globe',
-      price: 79
-    },
-    bundle: {
-      sku: 'bundle',
-      label: 'Family Keepsake Bundle',
-      shortLabel: 'Bundle (All 3)',
-      price: 0
     }
   };
-
-  const BUNDLE_ITEMS = ['parchment', 'calendar', 'globe'];
-  const BUNDLE_UNIT_PRICE = BUNDLE_ITEMS.reduce((sum, sku) => sum + STORE_PRODUCTS[sku].price, 0);
-  STORE_PRODUCTS.bundle.price = BUNDLE_UNIT_PRICE;
 
   function roundMoney(value) {
     const numeric = Number(value);
@@ -75,7 +54,7 @@
     return allowedValues.includes(cleaned) ? cleaned : fallback;
   }
 
-  function sanitizeProduct(value, fallback = 'bundle') {
+  function sanitizeProduct(value, fallback = 'paper-print') {
     return sanitizeEnum(value, PRODUCT_SKUS, fallback);
   }
 
@@ -104,7 +83,7 @@
 
   function getProductBySku(sku) {
     const normalizedSku = sanitizeProduct(sku);
-    return STORE_PRODUCTS[normalizedSku] || STORE_PRODUCTS.bundle;
+    return STORE_PRODUCTS[normalizedSku] || STORE_PRODUCTS['paper-print'];
   }
 
   function getProductPricing(productSku, quantityValue) {
@@ -113,18 +92,15 @@
     const product = getProductBySku(sku);
     const unitPrice = roundMoney(product.price);
     const subtotal = roundMoney(unitPrice * quantity);
-    const discountPercent = sku === 'bundle' ? BUNDLE_DISCOUNT_PERCENT : 0;
-    const discountAmount = roundMoney(subtotal * (discountPercent / 100));
-    const total = roundMoney(subtotal - discountAmount);
 
     return {
       sku,
       quantity,
       unitPrice,
       subtotal,
-      discountPercent,
-      discountAmount,
-      total
+      discountPercent: 0,
+      discountAmount: 0,
+      total: roundMoney(subtotal)
     };
   }
 
@@ -161,26 +137,30 @@
     return `${path}?${query.toString()}`;
   }
 
-  function deriveRecommendedProduct(flags) {
-    const source = flags && typeof flags === 'object' ? flags : {};
-    const hasCalendar = parseBooleanFlag(source.enableCalendarDates ?? source.enableBirthdays, true);
-    const hasGlobe = parseBooleanFlag(source.enableGlobeCountries, true);
-
-    if (hasCalendar && hasGlobe) return 'bundle';
-    if (hasCalendar) return 'calendar';
-    if (hasGlobe) return 'globe';
-    return 'parchment';
+  function deriveRecommendedProduct() {
+    return 'paper-print';
   }
 
-  function isAllowedParchmentStyle(style) {
+  function isAllowedPrintStyle(style) {
     const cleaned = sanitizeText(style, 32);
-    return PARCHMENT_STYLES.includes(cleaned);
+    return PRINT_STYLES.includes(cleaned);
+  }
+
+  function isAllowedPaperFinish(finish) {
+    const cleaned = sanitizeText(finish, 32);
+    return PAPER_FINISHES.includes(cleaned);
+  }
+
+  function isAllowedPrintSize(size) {
+    const cleaned = sanitizeText(size, 32);
+    return PRINT_SIZES.includes(cleaned);
   }
 
   global.AncestrioStoreUtils = {
     STORE_CURRENCY,
-    BUNDLE_DISCOUNT_PERCENT,
-    PARCHMENT_STYLES: PARCHMENT_STYLES.slice(),
+    PRINT_STYLES: PRINT_STYLES.slice(),
+    PAPER_FINISHES: PAPER_FINISHES.slice(),
+    PRINT_SIZES: PRINT_SIZES.slice(),
     PRODUCT_SKUS: PRODUCT_SKUS.slice(),
     SOURCE_VALUES: SOURCE_VALUES.slice(),
     VIEW_VALUES: VIEW_VALUES.slice(),
@@ -197,6 +177,8 @@
     sanitizeView,
     buildStoreUrl,
     deriveRecommendedProduct,
-    isAllowedParchmentStyle
+    isAllowedPrintStyle,
+    isAllowedPaperFinish,
+    isAllowedPrintSize
   };
 })(window);

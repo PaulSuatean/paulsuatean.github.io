@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="../styles/components.css" />
   <link rel="stylesheet" href="../styles/page-overrides.css" />
   <link rel="stylesheet" href="../styles/page-common.css" />
-  <link rel="stylesheet" href="../styles/dashboard.css?v=5" />
+  <link rel="stylesheet" href="../styles/dashboard.css?v=16" />
   <link rel="stylesheet" href="../styles/shell.css?v=7" />
 </head>
 <body class="dashboard-page site-shell has-app-toolbar">
@@ -33,7 +33,7 @@
       <nav class="site-header__nav" id="siteNav" aria-label="Primary">
         <a href="../index.html">Home</a>
         <a href="demo-tree.html">Demo</a>
-        <a href="store.html?product=parchment&source=site-header&view=tree">Store</a>
+        <a href="store.html?product=paper-print&source=site-header&view=tree">Store</a>
         <a href="contact.html">Contact</a>
       </nav>
       <div class="site-header__actions">
@@ -97,8 +97,46 @@
         <div class="spinner"></div>
         <p>Loading your trees...</p>
       </div>
+
+      <section class="account-panel surface-card" id="accountPanel" aria-label="Account settings">
+        <div class="account-panel__intro">
+          <p class="page-kicker">Account</p>
+          <h2 class="account-panel__title">Account &amp; data controls</h2>
+          <p class="account-panel__subtitle">Manage your account, review data policies, and remove your data when needed.</p>
+        </div>
+        <div class="account-panel__body">
+          <div
+            class="account-warning"
+            title="Deleting your account removes your trees, order requests, and profile data."
+          >
+            <span class="account-warning__title">Delete account</span>
+            <span class="account-warning__text">Removes trees, orders, and profile data.</span>
+            <span class="account-guest-note" id="accountGuestNote" hidden>Guest mode is local-only. Exit guest mode to delete a cloud account.</span>
+          </div>
+          <div class="account-panel__card">
+            <span class="account-label">Signed in as</span>
+            <span class="account-value" id="accountIdentity">Loading...</span>
+          </div>
+          <button type="button" class="btn-danger" id="deleteAccountBtn">Delete account</button>
+        </div>
+      </section>
     </div>
   </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <p>&copy; <span data-site-footer-year></span> Ancestrio</p>
+      <div class="site-footer__links">
+        <a href="store.html?product=paper-print&source=dashboard-footer&view=tree">Store</a>
+        <a href="demo-tree.html">Demo</a>
+        <a href="contact.html">Contact</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="terms.html">Terms</a>
+        <a href="cookies.html">Cookies</a>
+        <a href="https://github.com/PaulSuatean/paulsuatean.github.io" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </div>
+    </div>
+  </footer>
 
   <!-- Create Tree Wizard Modal -->
   <div id="createTreeModal" class="modal" style="display: none;">
@@ -417,6 +455,44 @@
     </div>
   </div>
 
+  <!-- Delete Account Modal -->
+  <div id="deleteAccountModal" class="modal" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Delete Account?</h3>
+          <button class="modal-close" id="closeDeleteAccountModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p>This permanently removes your account and associated data.</p>
+          <ul class="account-delete-list">
+            <li>All family trees in your account</li>
+            <li>Order requests linked to this account</li>
+            <li>Your account profile details</li>
+          </ul>
+          <div class="form-group">
+            <label class="form-label" for="deleteAccountConfirmInput">Type DELETE to confirm</label>
+            <input type="text" class="form-input" id="deleteAccountConfirmInput" autocomplete="off" />
+          </div>
+          <div class="account-delete-reauth" id="deleteAccountReauth" style="display: none;">
+            <p id="deleteAccountReauthCopy">For your security, please re-authenticate to finish deletion.</p>
+            <div class="form-group" id="deleteAccountPasswordGroup">
+              <label class="form-label" for="deleteAccountPassword">Password</label>
+              <input type="password" class="form-input" id="deleteAccountPassword" autocomplete="current-password" />
+              <button type="button" class="btn-secondary account-reauth-btn" id="deleteAccountPasswordBtn">Confirm Password</button>
+            </div>
+            <button type="button" class="btn-secondary account-reauth-btn" id="deleteAccountGoogleBtn">Re-authenticate with Google</button>
+          </div>
+          <div class="account-delete-error" id="deleteAccountError" aria-live="polite"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" id="cancelDeleteAccountBtn">Cancel</button>
+          <button type="button" class="btn-danger" id="confirmDeleteAccountBtn">Delete account</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Firebase SDK -->
   <script src="../scripts/runtime.js"></script>
   <script src="../scripts/night-sky.js"></script>
@@ -429,7 +505,7 @@
   <script src="../scripts/dom-display.js"></script>
   <script src="../scripts/firebase-config.js?v=5"></script>
   <script src="../scripts/store-utils.js"></script>
-  <script src="../scripts/dashboard.js?v=6"></script>
+  <script src="../scripts/dashboard.js?v=11"></script>
   <script
     type="text/plain"
     data-consent="optional"

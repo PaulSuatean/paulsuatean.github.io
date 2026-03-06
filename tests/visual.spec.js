@@ -59,7 +59,7 @@ const pages = [
   },
   {
     name: 'store',
-    path: '/pages/store.html?product=parchment&source=visual-test&view=tree',
+    path: '/pages/store.html?product=paper-print&source=visual-test&view=tree',
     readySelector: '.product-grid',
     alignmentScopes: ['.site-header__inner', '.store-hero', '.store-confidence', '.product-grid', '.store-hero-actions'],
     overlapScopes: ['.site-header__inner', '.store-hero', '.product-grid', '.store-confidence', '.site-footer__inner'],

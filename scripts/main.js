@@ -126,6 +126,8 @@
   const TREE_ZOOM_MAX = 8;
   const TREE_INITIAL_SCALE_CAP_DESKTOP = 0.86;
   const TREE_INITIAL_SCALE_CAP_MOBILE = 0.92;
+  const TREE_INITIAL_SCALE_CAP_DEMO_DESKTOP = 0.79;
+  const TREE_INITIAL_SCALE_CAP_DEMO_MOBILE = 0.85;
   const level = {
     vGap: 180, // vertical distance between generations (increased)
     hGap: 28,  // additional horizontal spacing
@@ -618,7 +620,7 @@
     return sanitizeStoreText(value, 120).replace(/[^a-zA-Z0-9_-]/g, '');
   }
 
-  function sanitizeStoreProduct(value, fallback = 'parchment') {
+  function sanitizeStoreProduct(value, fallback = 'paper-print') {
     if (
       typeof window !== 'undefined' &&
       window.AncestrioStoreUtils &&
@@ -627,14 +629,12 @@
       return window.AncestrioStoreUtils.sanitizeProduct(value, fallback);
     }
     const normalized = sanitizeStoreText(value, 32).toLowerCase();
-    const allowed = ['parchment', 'calendar', 'globe', 'bundle'];
+    const allowed = ['paper-print'];
     return allowed.includes(normalized) ? normalized : fallback;
   }
 
   function getStoreProductForView(view) {
-    if (view === 'calendar') return 'calendar';
-    if (view === 'globe') return 'globe';
-    return 'parchment';
+    return 'paper-print';
   }
 
   function getStoreProductLabel(productSku) {
@@ -649,10 +649,7 @@
         return product.shortLabel || product.label || 'Family keepsake';
       }
     }
-    if (sku === 'calendar') return 'Birthday Calendar';
-    if (sku === 'globe') return 'Family Globe';
-    if (sku === 'bundle') return 'Family Bundle';
-    return 'Parchment Print';
+    return 'Printed Paper Tree';
   }
 
   function getTreeIdFromUrl() {
@@ -706,6 +703,22 @@
     return `store.html?${params.toString()}`;
   }
 
+  const DEFAULT_VIEW_BACKGROUND = 'theme-default';
+  const DEFAULT_VIEW_BUBBLE = 'bubble-classic';
+  const VIEW_BACKGROUND_IDS = new Set([
+    'theme-default',
+    'parchment-classic',
+    'parchment-vintage',
+    'parchment-minimal',
+    'parchment-photo'
+  ]);
+  const VIEW_BUBBLE_IDS = new Set([
+    'bubble-classic',
+    'bubble-heraldic',
+    'bubble-ink',
+    'bubble-soft'
+  ]);
+
   function parseViewerFeatureFlag(value, fallback = true) {
     if (typeof value === 'boolean') return value;
     if (typeof value === 'number') return value !== 0;
@@ -717,14 +730,35 @@
     return fallback;
   }
 
+  function sanitizeViewerStyleValue(value, fallback, allowedValues) {
+    const normalized = String(value == null ? '' : value)
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '');
+    return allowedValues.has(normalized) ? normalized : fallback;
+  }
+
   function resolveViewerSettings(source) {
     const calendarFlag = (source && Object.prototype.hasOwnProperty.call(source, 'enableCalendarDates'))
       ? source.enableCalendarDates
       : source?.enableBirthdays;
+    const nested = (source && source.viewStyle && typeof source.viewStyle === 'object')
+      ? source.viewStyle
+      : null;
 
     return {
       enableCalendarDates: parseViewerFeatureFlag(calendarFlag, true),
-      enableGlobeCountries: parseViewerFeatureFlag(source?.enableGlobeCountries, true)
+      enableGlobeCountries: parseViewerFeatureFlag(source?.enableGlobeCountries, true),
+      viewBackground: sanitizeViewerStyleValue(
+        source?.viewBackground ?? source?.background ?? nested?.background,
+        DEFAULT_VIEW_BACKGROUND,
+        VIEW_BACKGROUND_IDS
+      ),
+      viewBubble: sanitizeViewerStyleValue(
+        source?.viewBubble ?? source?.bubble ?? nested?.bubble,
+        DEFAULT_VIEW_BUBBLE,
+        VIEW_BUBBLE_IDS
+      )
     };
   }
 
@@ -760,6 +794,22 @@
     }
     if (!isViewEnabled(currentView)) {
       currentView = 'tree';
+    }
+  }
+
+  function applyTreeViewStyle(source) {
+    const settings = resolveViewerSettings(source);
+    const body = document.body;
+    if (body) {
+      body.setAttribute('data-view-bg', settings.viewBackground);
+      body.setAttribute('data-view-bubble', settings.viewBubble);
+    }
+
+    if (viewStyleController && typeof viewStyleController.setState === 'function') {
+      viewStyleController.setState({
+        background: settings.viewBackground,
+        bubble: settings.viewBubble
+      }, { persist: false, emit: false });
     }
   }
 
@@ -963,13 +1013,28 @@
   applyTreeViewSettings(typeof window !== 'undefined' ? window.FIREBASE_TREE_SETTINGS : null);
   refreshStoreContext();
   initViewStylePanel();
+  applyTreeViewStyle(typeof window !== 'undefined' ? window.FIREBASE_TREE_SETTINGS : null);
   setView(currentView);
 
+  function isDemoOrPreviewTreeView() {
+    return document.body.classList.contains('demo-tree-page') && !document.body.classList.contains('has-app-toolbar');
+  }
   function getTreeDefaultPadding() {
-    if (document.body.classList.contains('demo-tree-page') && !document.body.classList.contains('has-app-toolbar')) {
-      return mobileQuery && mobileQuery.matches ? 6 : 18;
+    if (isDemoOrPreviewTreeView()) {
+      return mobileQuery && mobileQuery.matches ? 22 : 46;
     }
     return mobileQuery && mobileQuery.matches ? 12 : 36;
+  }
+  function getTreeInitialScaleCap() {
+    const isMobile = mobileQuery && mobileQuery.matches;
+    if (isDemoOrPreviewTreeView()) {
+      return isMobile ? TREE_INITIAL_SCALE_CAP_DEMO_MOBILE : TREE_INITIAL_SCALE_CAP_DEMO_DESKTOP;
+    }
+    return isMobile ? TREE_INITIAL_SCALE_CAP_MOBILE : TREE_INITIAL_SCALE_CAP_DESKTOP;
+  }
+  function getTreeVerticalPaddingBoost() {
+    if (!isDemoOrPreviewTreeView()) return 0;
+    return mobileQuery && mobileQuery.matches ? 12 : 20;
   }
   function getTreeFocusPadding() {
     return mobileQuery && mobileQuery.matches ? 60 : 70;
@@ -1074,8 +1139,9 @@
     const insets = getTreeViewportInsets();
     const leftPadding = padding + insets.left;
     const rightPadding = padding + insets.right;
-    const topPadding = padding + insets.top;
-    const bottomPadding = padding + insets.bottom;
+    const verticalBoost = getTreeVerticalPaddingBoost();
+    const topPadding = padding + insets.top + verticalBoost;
+    const bottomPadding = padding + insets.bottom + verticalBoost;
     const safeWidth = Math.max(1, w - leftPadding - rightPadding);
     const safeHeight = Math.max(1, h - topPadding - bottomPadding);
     const scale = Math.min(
@@ -1083,9 +1149,7 @@
       safeHeight / Math.max(bbox.height, 1)
     );
     const safeScale = Math.max(scale, 0.02);
-    const initialCap = mobileQuery && mobileQuery.matches
-      ? TREE_INITIAL_SCALE_CAP_MOBILE
-      : TREE_INITIAL_SCALE_CAP_DESKTOP;
+    const initialCap = getTreeInitialScaleCap();
     const appliedScale = Math.min(safeScale, initialCap);
     const maxScale = Math.max(TREE_ZOOM_MAX, safeScale * 5);
     const centerX = leftPadding + (safeWidth / 2);
@@ -1406,6 +1470,7 @@
       if (typeof window !== 'undefined') {
         refreshStoreContext();
         applyTreeViewSettings(window.FIREBASE_TREE_SETTINGS || null);
+        applyTreeViewStyle(window.FIREBASE_TREE_SETTINGS || null);
         setView(currentView);
       }
       familyTreeData = data;
