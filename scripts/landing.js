@@ -23,7 +23,7 @@
       const nextIndex = clampIndex(index);
       const shouldAnimate = options.animate !== false && !prefersReducedMotion.matches;
       track.style.transition = shouldAnimate ? '' : 'none';
-      track.style.transform = `translateX(-${nextIndex * 100}%)`;
+      track.style.transform = 'none';
 
       slides.forEach((slide, idx) => {
         const isActive = idx === nextIndex;
