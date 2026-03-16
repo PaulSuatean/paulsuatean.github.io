@@ -88,10 +88,9 @@ body.site-shell {
   --shell-contrast-text: #f6fbff;
   --shell-contrast-muted: rgba(236, 245, 255, 0.76);
   --shell-contrast-chip-bg: rgba(125, 185, 255, 0.14);
-  --shell-page-glow-left: radial-gradient(circle, rgba(125, 185, 255, 0.22) 0%, rgba(125, 185, 255, 0.07) 32%, transparent 74%);
-  --shell-page-glow-right: radial-gradient(circle, rgba(239, 181, 95, 0.18) 0%, rgba(239, 181, 95, 0.06) 32%, transparent 74%);
-  background: var(--shell-page-bg);
-  background-attachment: fixed;
+  --shell-page-glow-left: radial-gradient(circle at 10% 8%, rgba(125, 185, 255, 0.16) 0%, rgba(125, 185, 255, 0.05) 24%, transparent 48%);
+  --shell-page-glow-right: radial-gradient(circle at 90% 7%, rgba(239, 181, 95, 0.14) 0%, rgba(239, 181, 95, 0.04) 22%, transparent 46%);
+  background: var(--shell-page-glow-left), var(--shell-page-glow-right), var(--shell-page-bg);
 }
 
 body.theme-dark.site-shell {
@@ -126,33 +125,8 @@ body.theme-dark.site-shell {
   --shell-contrast-text: #f6fbff;
   --shell-contrast-muted: rgba(236, 245, 255, 0.7);
   --shell-contrast-chip-bg: rgba(125, 185, 255, 0.16);
-  --shell-page-glow-left: radial-gradient(circle, rgba(125, 185, 255, 0.16) 0%, rgba(125, 185, 255, 0.06) 32%, transparent 76%);
-  --shell-page-glow-right: radial-gradient(circle, rgba(241, 195, 111, 0.12) 0%, rgba(241, 195, 111, 0.04) 32%, transparent 76%);
-}
-
-body.site-shell::before,
-body.site-shell::after {
-  content: "";
-  position: fixed;
-  top: -22vh;
-  width: min(62vw, 920px);
-  height: min(62vw, 920px);
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.72;
-  filter: blur(28px);
-  transform: translateZ(0);
-}
-
-body.site-shell::before {
-  left: -20vw;
-  background: var(--shell-page-glow-left);
-}
-
-body.site-shell::after {
-  right: -18vw;
-  background: var(--shell-page-glow-right);
+  --shell-page-glow-left: radial-gradient(circle at 11% 8%, rgba(125, 185, 255, 0.12) 0%, rgba(125, 185, 255, 0.04) 22%, transparent 48%);
+  --shell-page-glow-right: radial-gradient(circle at 89% 7%, rgba(241, 195, 111, 0.08) 0%, rgba(241, 195, 111, 0.03) 18%, transparent 44%);
 }
 
 body.site-shell main,
@@ -195,9 +169,8 @@ body.site-shell:not(.has-app-toolbar) {
   padding: var(--site-header-button-gap) 18px;
   border: 1px solid var(--shell-panel-border-strong);
   border-radius: 999px;
-  background: var(--shell-panel-bg-strong);
+  background: var(--shell-panel-bg-accented-strong);
   box-shadow: var(--shadow-sm);
-  backdrop-filter: blur(16px);
 }
 
 .site-header__inner > * {
@@ -689,7 +662,6 @@ body.site-shell .help-modal,
 body.site-shell .add-member-modal {
   padding: clamp(12px, 3vw, 24px);
   background: var(--shell-overlay-bg);
-  backdrop-filter: blur(14px);
 }
 
 body.site-shell .modal-dialog,
@@ -698,7 +670,7 @@ body.site-shell .add-member-card,
 body.site-shell .store-modal-dialog {
   border: 1px solid var(--shell-panel-border-strong);
   border-radius: 28px;
-  background: var(--shell-panel-bg-strong);
+  background: var(--shell-panel-bg-accented-strong);
   box-shadow: var(--shadow-lg);
 }
 
@@ -1099,5 +1071,4 @@ body.dashboard-page.site-shell .dashboard-main {
     padding: 0;
   }
 }
-
 

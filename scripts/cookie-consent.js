@@ -79,9 +79,26 @@
       }
 
       if (canWriteSync) {
-        const markup = buildExecutableScriptTag(placeholder);
+        var markup = buildExecutableScriptTag(placeholder);
         placeholder.dataset.optionalLoaded = 'true';
-        document.write(markup);
+        var temp = document.createElement('div');
+        temp.innerHTML = markup;
+        var fragment = document.createDocumentFragment();
+        while (temp.firstChild) {
+          if (temp.firstChild.tagName === 'SCRIPT') {
+            var oldScript = temp.firstChild;
+            var newScript = document.createElement('script');
+            Array.from(oldScript.attributes).forEach(function(attr) {
+              newScript.setAttribute(attr.name, attr.value);
+            });
+            newScript.textContent = oldScript.textContent;
+            temp.removeChild(oldScript);
+            fragment.appendChild(newScript);
+          } else {
+            fragment.appendChild(temp.firstChild);
+          }
+        }
+        (document.head || document.documentElement).appendChild(fragment);
         return;
       }
 
@@ -113,7 +130,7 @@
       #${LAUNCHER_ID} {
         position: fixed;
         left: 12px;
-        bottom: calc(env(safe-area-inset-bottom) + 12px);
+        top: 12px;
         z-index: 2147483646;
         display: inline-flex;
         align-items: center;
@@ -167,7 +184,7 @@
       #${PANEL_ID} {
         position: fixed;
         left: 12px;
-        bottom: calc(env(safe-area-inset-bottom) + 64px);
+        top: 64px;
         z-index: 2147483647;
         width: min(390px, calc(100vw - 24px));
         border-radius: 18px;
@@ -176,7 +193,7 @@
         box-shadow: var(--shadow-xl, 0 24px 42px rgba(15, 23, 42, 0.3));
         color: var(--text, #1f2937);
         font-family: var(--font-body, "Inter", "Segoe UI", sans-serif);
-        transform: translateY(14px) scale(0.98);
+        transform: translateY(-14px) scale(0.98);
         opacity: 0;
         pointer-events: none;
         transition: transform var(--transition-base, 200ms) ease, opacity var(--transition-base, 200ms) ease;
@@ -383,7 +400,7 @@
 
       @media (max-width: 640px) {
         #${PANEL_ID} {
-          bottom: calc(env(safe-area-inset-bottom) + 58px);
+          top: 58px;
           border-radius: 14px;
         }
 

@@ -4,6 +4,14 @@
   const AUTH_PAGE_PATTERN = /(?:^|\/)auth\.html(?:[?#]|$)/i;
   const DASHBOARD_PAGE_PATTERN = /(?:^|\/)dashboard\.html(?:[?#]|$)/i;
 
+  function debounce(fn, ms) {
+    let id;
+    return function (...args) {
+      clearTimeout(id);
+      id = setTimeout(() => fn.apply(this, args), ms);
+    };
+  }
+
   function readCachedAuthState() {
     try {
       const raw = localStorage.getItem(HEADER_AUTH_CACHE_KEY);
@@ -39,7 +47,7 @@
         email: '',
         updatedAt: Date.now()
       };
-      localStorage.setItem(HEADER_AUTH_CACHE_KEY, JSON.stringify(payload));
+      try { localStorage.setItem(HEADER_AUTH_CACHE_KEY, JSON.stringify(payload)); } catch (_) { /* storage unavailable */ }
       return payload;
     } catch (_) {
       return {
@@ -200,7 +208,11 @@
         menuBtn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
         const icon = menuBtn.querySelector('.material-symbols-outlined');
         if (icon) {
-          icon.textContent = shouldOpen ? 'close' : 'menu';
+          if (window.AncestrioIcons && typeof window.AncestrioIcons.setIcon === 'function') {
+            window.AncestrioIcons.setIcon(icon, shouldOpen ? 'close' : 'menu');
+          } else {
+            icon.textContent = shouldOpen ? 'close' : 'menu';
+          }
         }
       }
       syncMobileNavState();
@@ -227,13 +239,13 @@
       link.addEventListener('click', () => setMenuOpen(false));
     });
 
-    window.addEventListener('resize', () => {
+    window.addEventListener('resize', debounce(() => {
       if (!isMobileNavMode()) {
         setMenuOpen(false);
       } else {
         syncMobileNavState();
       }
-    });
+    }, 150));
 
     document.addEventListener('click', (event) => {
       if (!isMobileNavMode() || !header.classList.contains('menu-open')) return;
@@ -247,6 +259,43 @@
         setMenuOpen(false, { restoreFocus: true });
       }
     });
+
+    // Move theme button out of the header on mobile so it escapes the
+    // backdrop-filter containing block and can be fixed to the viewport.
+    // Move the dashboard link next to the burger for reachability.
+    const themeBtn = header.querySelector('#themeBtn');
+    const themeBtnParent = themeBtn?.parentElement;
+    const themeBtnNextSibling = themeBtn?.nextSibling;
+
+    const { dashboardLink } = resolveHeaderLinks(header);
+    const dashLinkParent = dashboardLink?.parentElement;
+    const dashLinkNextSibling = dashboardLink?.nextSibling;
+    const headerInner = header.querySelector('.site-header__inner');
+
+    function syncMobileLayout() {
+      if (!headerInner) return;
+      if (isMobileNavMode()) {
+        if (themeBtn && themeBtn.parentElement !== document.body) {
+          document.body.appendChild(themeBtn);
+        }
+        if (dashboardLink && menuBtn && dashboardLink.parentElement !== headerInner) {
+          headerInner.insertBefore(dashboardLink, menuBtn);
+        }
+      } else {
+        if (themeBtn && themeBtn.parentElement === document.body && themeBtnParent) {
+          themeBtnParent.insertBefore(themeBtn, themeBtnNextSibling);
+        }
+        if (dashboardLink && dashboardLink.parentElement === headerInner && dashLinkParent) {
+          dashLinkParent.insertBefore(dashboardLink, dashLinkNextSibling);
+        }
+      }
+    }
+
+    syncMobileLayout();
+
+    window.addEventListener('resize', debounce(() => {
+      syncMobileLayout();
+    }, 150));
 
     syncMobileNavState();
   }

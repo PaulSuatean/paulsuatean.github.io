@@ -1280,7 +1280,6 @@ body.dashboard-page .spinner {
 body.dashboard-page .modal {
   padding: 24px;
   background: var(--shell-overlay-bg);
-  backdrop-filter: blur(10px);
 }
 
 body.dashboard-page .modal-dialog {

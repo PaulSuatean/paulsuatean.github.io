@@ -9,6 +9,12 @@ tmp/
 wizard-audit/
 tmp-*.png
 
+# Build output
+dist/
+playwright-report/
+test-results/
+visual-audit/
+
 # IDE
 .vscode/
 .idea/

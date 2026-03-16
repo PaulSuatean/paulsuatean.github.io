@@ -1,0 +1,17 @@
+{
+  "name": "ancestrio-site",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build-site.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.3"
+  },
+  "dependencies": {
+    "@material-symbols/svg-400": "^0.40.2",
+    "d3": "^7.9.0",
+    "firebase": "^12.10.0",
+    "sharp": "^0.34.5",
+    "topojson-client": "^3.1.0"
+  }
+}

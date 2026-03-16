@@ -183,10 +183,15 @@ service cloud.firestore {
     // Trees collection - users can manage their own trees
     match /trees/{treeId} {
       // Public trees are readable by anyone.
-      // Private trees are readable only by their owner.
+      // Private trees are readable only by their owner, or by any
+      // authenticated user when the tree has active invite links
+      // (hasInvites == true). The invite URL itself acts as the
+      // access control — similar to "anyone with the link" sharing.
       allow read: if resource.data.privacy == "public" ||
                      (request.auth != null &&
-                      resource.data.userId == request.auth.uid);
+                      resource.data.userId == request.auth.uid) ||
+                     (request.auth != null &&
+                      resource.data.hasInvites == true);
       
       // Allow creating trees if user is authenticated and setting themselves as owner
       allow create: if request.auth != null && 
@@ -210,6 +215,87 @@ service cloud.firestore {
 
       allow delete: if request.auth != null &&
                        resource.data.userId == request.auth.uid;
+    }
+
+    // Tree invites — the tree owner creates invite tokens; anyone with the
+    // token can read the invite to learn which tree it unlocks.
+    match /treeInvites/{inviteId} {
+      // Anyone can read an invite if they know the ID (from the shareable link).
+      // Invite documents only store tree metadata (treeId, ownerId, treeName,
+      // role), not tree data itself, so public reads are safe. Actual tree
+      // data is still protected by the /trees/{treeId} rules.
+      allow read: if true;
+
+      // Only the tree owner can create/delete invites for their trees.
+      allow create: if request.auth != null &&
+                       request.resource.data.ownerId == request.auth.uid &&
+                       isNonEmptyString(request.resource.data.treeId, 120) &&
+                       isNonEmptyString(request.resource.data.ownerId, 120) &&
+                       isStringWithMax(request.resource.data.treeName, 160) &&
+                       request.resource.data.role == "suggest" &&
+                       request.resource.data.createdAt is timestamp;
+
+      allow delete: if request.auth != null &&
+                       resource.data.ownerId == request.auth.uid;
+
+      allow update: if false;
+    }
+
+    // Tree suggestions — invited collaborators submit suggestions that are
+    // reviewed by the tree owner.
+    match /treeSuggestions/{suggestionId} {
+      // The tree owner can read all suggestions for their trees.
+      // The author can read their own suggestions.
+      allow read: if request.auth != null &&
+                     (resource.data.ownerId == request.auth.uid ||
+                      resource.data.authorId == request.auth.uid);
+
+      // Any authenticated user can create a suggestion if they set themselves
+      // as the author and provide the required fields.
+      allow create: if request.auth != null &&
+                       request.resource.data.keys().hasOnly(["treeId", "ownerId", "authorId", "authorName", "treeName", "message", "status", "createdAt"]) &&
+                       request.resource.data.authorId == request.auth.uid &&
+                       isNonEmptyString(request.resource.data.treeId, 120) &&
+                       isNonEmptyString(request.resource.data.ownerId, 120) &&
+                       isNonEmptyString(request.resource.data.authorId, 120) &&
+                       isStringWithMax(request.resource.data.authorName, 120) &&
+                       isStringWithMax(request.resource.data.treeName, 160) &&
+                       isNonEmptyString(request.resource.data.message, 1000) &&
+                       request.resource.data.status == "pending" &&
+                       request.resource.data.createdAt is timestamp;
+
+      // Only the tree owner can update (accept/dismiss) a suggestion.
+      allow update: if request.auth != null &&
+                       resource.data.ownerId == request.auth.uid &&
+                       request.resource.data.status in ["accepted", "dismissed"] &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "reviewedAt"]);
+
+      // Owner or author can delete.
+      allow delete: if request.auth != null &&
+                       (resource.data.ownerId == request.auth.uid ||
+                        resource.data.authorId == request.auth.uid);
+    }
+
+    // Shared trees — users save references to trees they were invited to
+    // so those trees appear on their dashboard.
+    match /sharedTrees/{docId} {
+      allow read: if request.auth != null &&
+                     resource.data.userId == request.auth.uid;
+
+      allow create: if request.auth != null &&
+                       request.resource.data.userId == request.auth.uid &&
+                       request.resource.data.keys().hasOnly(["userId", "treeId", "ownerId", "treeName", "inviteId", "addedAt"]) &&
+                       isNonEmptyString(request.resource.data.userId, 120) &&
+                       isNonEmptyString(request.resource.data.treeId, 120) &&
+                       isNonEmptyString(request.resource.data.ownerId, 120) &&
+                       isStringWithMax(request.resource.data.treeName, 160) &&
+                       isStringWithMax(request.resource.data.inviteId, 120) &&
+                       request.resource.data.addedAt is timestamp;
+
+      allow delete: if request.auth != null &&
+                       resource.data.userId == request.auth.uid;
+
+      allow update: if false;
     }
   }
 }

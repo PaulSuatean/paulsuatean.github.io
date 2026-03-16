@@ -1,6 +1,16 @@
 // Authentication Logic
 
-document.addEventListener('DOMContentLoaded', () => {
+const authFirebaseReadyPromise = (
+  window.AncestrioDeps &&
+  typeof window.AncestrioDeps.ensureFirebaseApp === 'function'
+    ? window.AncestrioDeps.ensureFirebaseApp()
+    : Promise.resolve(typeof initializeFirebase === 'function' ? initializeFirebase() : false)
+).catch((error) => {
+  console.error('Failed to load Firebase for auth page:', error);
+  return false;
+});
+
+document.addEventListener('DOMContentLoaded', async () => {
   const USERNAME_EMAIL_DOMAIN = 'users.ancestrio.local';
   
   // Theme toggle
@@ -24,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const postAuthRedirect = resolvePostAuthRedirect();
 
   // Initialize Firebase
-  const firebaseReady = initializeFirebase();
+  const firebaseReady = await authFirebaseReadyPromise;
   if (!firebaseReady) {
     console.error('Firebase initialization failed');
     showError('Cloud sign-in is unavailable right now. You can still continue as Guest (Local).');
@@ -78,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
       showLoading(loginForm);
       await signInWithPasswordIdentifier(resolvedLogin, password);
       window.AncestrioHeaderAuthCache?.setFromUser?.(auth.currentUser || null);
-      localStorage.removeItem('guestMode');
+      try { localStorage.removeItem('guestMode'); } catch (_) { /* storage unavailable */ }
       redirectAfterAuth();
     } catch (error) {
       console.error('Login error:', error);
@@ -124,7 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       
       window.AncestrioHeaderAuthCache?.setFromUser?.(userCredential.user || auth.currentUser || null);
-      localStorage.removeItem('guestMode');
+      try { localStorage.removeItem('guestMode'); } catch (_) { /* storage unavailable */ }
       redirectAfterAuth();
     } catch (error) {
       console.error('Signup error:', error);
@@ -154,7 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       
       window.AncestrioHeaderAuthCache?.setFromUser?.(result.user || auth.currentUser || null);
-      localStorage.removeItem('guestMode');
+      try { localStorage.removeItem('guestMode'); } catch (_) { /* storage unavailable */ }
       redirectAfterAuth();
     } catch (error) {
       if (error.code !== 'auth/popup-closed-by-user') {
@@ -166,7 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Guest Mode (local browser storage only)
   if (anonymousSignInBtn) {
     anonymousSignInBtn.addEventListener('click', () => {
-      localStorage.setItem('guestMode', 'true');
+      try { localStorage.setItem('guestMode', 'true'); } catch (_) { /* storage unavailable */ }
       window.location.href = 'dashboard.html?guest=1';
     });
   }

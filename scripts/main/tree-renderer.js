@@ -665,8 +665,7 @@
         .attr('d', (d) => linkGen(d));
 
       updateDNAVisibility();
-      fitTreeWhenVisible(getTreeDefaultPadding(), 60);
-      requestAnimationFrame(() => fitTreeWhenVisible(getTreeDefaultPadding(), 30));
+      requestAnimationFrame(() => fitTreeWhenVisible(getTreeDefaultPadding(), 60));
     }
 
     return {

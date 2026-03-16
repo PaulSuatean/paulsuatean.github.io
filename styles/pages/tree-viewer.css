@@ -67,29 +67,27 @@ body.tree-viewer-page .controls-tree .order-print-btn {
   padding: 10px;
   border-radius: 22px;
   border: 1px solid var(--shell-panel-border);
-  background: color-mix(in srgb, var(--shell-panel-bg) 88%, transparent);
-  box-shadow: var(--shadow-md);
-  backdrop-filter: blur(12px);
+  background: var(--shell-panel-bg-accented-strong);
+  box-shadow: var(--shadow-sm);
   overflow-y: auto;
   scrollbar-width: thin;
 }
 
 body.theme-dark .view-style-panel {
-  background: color-mix(in srgb, var(--shell-panel-bg) 88%, transparent);
+  background: var(--shell-panel-bg-accented-strong);
 }
 
 body.tree-viewer-page.view-calendar #birthdaySection {
   inset: var(--viewer-style-panel-top) var(--viewer-calendar-panel-right) var(--viewer-style-panel-bottom) var(--viewer-calendar-panel-left);
   border: 1px solid var(--shell-panel-border);
   border-radius: 20px;
-  background: color-mix(in srgb, var(--shell-panel-bg) 90%, transparent);
-  backdrop-filter: blur(10px);
-  box-shadow: var(--shadow-lg);
+  background: var(--shell-panel-bg-accented-strong);
+  box-shadow: var(--shadow-md);
   overflow: hidden;
 }
 
 body.theme-dark.tree-viewer-page.view-calendar #birthdaySection {
-  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  background: var(--shell-panel-bg-accented-strong);
 }
 
 .view-style-group {
@@ -212,7 +210,6 @@ body.theme-dark.tree-viewer-page.view-calendar #birthdaySection {
 
 body.tree-viewer-page[data-view-bg="theme-default"] {
   background: var(--page-bg-gradient);
-  background-attachment: fixed;
 }
 
 body.tree-viewer-page[data-view-bg="parchment-classic"] {
@@ -222,7 +219,6 @@ body.tree-viewer-page[data-view-bg="parchment-classic"] {
     radial-gradient(circle at 82% 78%, rgba(81, 55, 18, 0.09), transparent 40%),
     repeating-linear-gradient(0deg, rgba(112, 78, 33, 0.05) 0 1px, transparent 1px 6px),
     linear-gradient(162deg, #f0dfbd 0%, #dec596 50%, #e7d5ad 100%);
-  background-attachment: fixed;
 }
 
 body.tree-viewer-page[data-view-bg="parchment-vintage"] {
@@ -232,7 +228,6 @@ body.tree-viewer-page[data-view-bg="parchment-vintage"] {
     radial-gradient(circle at 22% 84%, rgba(91, 54, 21, 0.16), transparent 36%),
     repeating-linear-gradient(90deg, rgba(66, 43, 18, 0.08) 0 1px, transparent 1px 8px),
     linear-gradient(168deg, #d5b78b 0%, #b69263 52%, #cfb286 100%);
-  background-attachment: fixed;
 }
 
 body.tree-viewer-page[data-view-bg="parchment-minimal"] {
@@ -241,7 +236,6 @@ body.tree-viewer-page[data-view-bg="parchment-minimal"] {
     radial-gradient(circle at 20% 22%, rgba(255, 255, 255, 0.3), transparent 36%),
     radial-gradient(circle at 84% 72%, rgba(92, 66, 29, 0.07), transparent 42%),
     linear-gradient(164deg, #f5ecd7 0%, #e9dbc0 52%, #f3e9d2 100%);
-  background-attachment: fixed;
 }
 
 body.tree-viewer-page[data-view-bg="parchment-photo"] {
@@ -252,7 +246,6 @@ body.tree-viewer-page[data-view-bg="parchment-photo"] {
   background-repeat: no-repeat, no-repeat;
   background-position: center center, center center;
   background-size: auto, cover;
-  background-attachment: fixed, fixed;
 }
 
 body.tree-viewer-page[data-view-bg^="parchment"] .day-clouds,
@@ -423,11 +416,8 @@ body.demo-tree-page.site-shell:not(.focus-mode) .topbar {
   padding: var(--site-header-button-gap) 18px;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 58%),
-    var(--shell-surface-accented);
-  box-shadow: var(--shadow-md);
-  backdrop-filter: blur(18px);
+  background: var(--shell-surface-accented-strong);
+  box-shadow: var(--shadow-sm);
   border-bottom: 1px solid var(--border);
 }
 

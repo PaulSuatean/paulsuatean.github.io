@@ -1933,9 +1933,8 @@ body.editor-page .editor-style-panel {
   border: 1px solid var(--editor-border-soft);
   background:
     linear-gradient(145deg, color-mix(in srgb, rgba(255, 255, 255, 0.1) 70%, transparent) 0%, transparent 48%),
-    color-mix(in srgb, var(--editor-panel-bg-strong) 88%, transparent);
+    color-mix(in srgb, var(--editor-panel-bg-strong) 96%, var(--bg) 4%);
   box-shadow: var(--editor-shadow-strong);
-  backdrop-filter: blur(18px);
   overflow: auto;
 }
 
@@ -2092,7 +2091,6 @@ body.editor-page .add-member-popup-item {
 
 body.editor-page .add-member-modal {
   background: var(--editor-overlay-bg);
-  backdrop-filter: blur(10px);
 }
 
 body.editor-page .add-member-card {
@@ -2216,7 +2214,6 @@ body.editor-page .setting-toggle-track {
 
 body.editor-page .modal {
   background: var(--editor-overlay-bg);
-  backdrop-filter: blur(14px);
 }
 
 body.editor-page .modal-dialog {
@@ -2545,9 +2542,8 @@ body.editor-page .editor-tabs {
   padding: 8px;
   border-radius: 999px;
   border: 1px solid var(--shell-panel-border);
-  background: color-mix(in srgb, var(--shell-panel-bg) 88%, transparent);
+  background: color-mix(in srgb, var(--shell-panel-bg-strong) 96%, transparent);
   box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(16px);
 }
 
 body.editor-page .editor-tab-highlight {
@@ -2801,4 +2797,3 @@ body.editor-page .settings-editor .instructions-list li + li {
     display: none;
   }
 }
-

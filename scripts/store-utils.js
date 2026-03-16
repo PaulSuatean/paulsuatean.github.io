@@ -20,7 +20,7 @@
   });
   const SOURCE_META = Object.freeze({
     landing: Object.freeze({ label: 'Landing', backHref: '../index.html' }),
-    contact: Object.freeze({ label: 'About & Contact', backHref: 'contact.html' }),
+    contact: Object.freeze({ label: 'About', backHref: 'contact.html' }),
     auth: Object.freeze({ label: 'Sign In', backHref: 'auth.html' }),
     dashboard: Object.freeze({ label: 'Dashboard', backHref: 'dashboard.html' }),
     editor: Object.freeze({ label: 'Editor', backHref: 'editor.html' }),

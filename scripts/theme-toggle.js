@@ -1,13 +1,21 @@
 (function (global) {
   const DEFAULT_THEME_KEY = 'tree-theme';
   const DEFAULT_DARK_CLASS = 'theme-dark';
+  const DEFAULT_LIGHT_CLASS = 'theme-light';
+  const themeInit = global.AncestrioThemeInit || null;
 
   function isNightTime() {
+    if (themeInit && typeof themeInit.isNightTime === 'function') {
+      return themeInit.isNightTime();
+    }
     const hour = new Date().getHours();
     return hour >= 20 || hour < 7;
   }
 
   function resolveInitialTheme(savedTheme) {
+    if (themeInit && typeof themeInit.resolveInitialTheme === 'function') {
+      return themeInit.resolveInitialTheme(savedTheme);
+    }
     if (savedTheme === 'dark' || savedTheme === 'light') {
       return savedTheme;
     }
@@ -24,7 +32,11 @@
     const iconName = isDark ? options.iconWhenDark : options.iconWhenLight;
 
     if (icon) {
-      icon.textContent = iconName;
+      if (global.AncestrioIcons && typeof global.AncestrioIcons.setIcon === 'function') {
+        global.AncestrioIcons.setIcon(icon, iconName);
+      } else {
+        icon.textContent = iconName;
+      }
     } else {
       themeBtn.textContent = iconName;
     }
@@ -36,6 +48,34 @@
     themeBtn.setAttribute('aria-label', label);
     themeBtn.setAttribute('title', label);
     themeBtn.setAttribute('aria-pressed', String(isDark));
+  }
+
+  function applyThemeState(theme, options) {
+    if (themeInit && typeof themeInit.applyTheme === 'function') {
+      themeInit.applyTheme(theme, document, {
+        darkClass: options.darkClass,
+        lightClass: DEFAULT_LIGHT_CLASS,
+        themeKey: options.themeKey
+      });
+      return;
+    }
+
+    const isDark = theme === 'dark';
+    document.body.classList.toggle(options.darkClass, isDark);
+    document.body.classList.toggle(DEFAULT_LIGHT_CLASS, !isDark);
+  }
+
+  function readActiveTheme(options) {
+    if (themeInit && typeof themeInit.getCurrentTheme === 'function') {
+      const activeTheme = themeInit.getCurrentTheme(document, {
+        darkClass: options.darkClass,
+        lightClass: DEFAULT_LIGHT_CLASS
+      });
+      if (activeTheme === 'dark' || activeTheme === 'light') {
+        return activeTheme;
+      }
+    }
+    return null;
   }
 
   function initThemeToggle(userOptions) {
@@ -53,18 +93,19 @@
     };
 
     const themeBtn = options.button;
-    const savedTheme = localStorage.getItem(options.themeKey);
-    const initialTheme = resolveInitialTheme(savedTheme);
-    document.body.classList.toggle(options.darkClass, initialTheme === 'dark');
+    let savedTheme = null;
+    try { savedTheme = localStorage.getItem(options.themeKey); } catch (_) { /* storage unavailable */ }
+    const initialTheme = readActiveTheme(options) || resolveInitialTheme(savedTheme);
+    applyThemeState(initialTheme, options);
     if (!savedTheme && options.persistInitialTheme) {
-      localStorage.setItem(options.themeKey, initialTheme);
+      try { localStorage.setItem(options.themeKey, initialTheme); } catch (_) { /* storage unavailable */ }
     }
     setThemeButtonState(themeBtn, initialTheme === 'dark', options);
 
     let autoThemeTimer = null;
     if (!savedTheme && options.autoRefreshMs > 0) {
       autoThemeTimer = window.setInterval(() => {
-        if (localStorage.getItem(options.themeKey)) {
+        if ((function() { try { return localStorage.getItem(options.themeKey); } catch (_) { return null; } })()) {
           window.clearInterval(autoThemeTimer);
           autoThemeTimer = null;
           return;
@@ -74,7 +115,7 @@
         const isDark = document.body.classList.contains(options.darkClass);
         const shouldBeDark = desiredTheme === 'dark';
         if (isDark !== shouldBeDark) {
-          document.body.classList.toggle(options.darkClass, shouldBeDark);
+          applyThemeState(desiredTheme, options);
           setThemeButtonState(themeBtn, shouldBeDark, options);
         }
       }, options.autoRefreshMs);
@@ -82,9 +123,10 @@
 
     if (themeBtn) {
       themeBtn.addEventListener('click', () => {
-        const nextIsDark = !document.body.classList.contains(options.darkClass);
-        document.body.classList.toggle(options.darkClass, nextIsDark);
-        localStorage.setItem(options.themeKey, nextIsDark ? 'dark' : 'light');
+        const nextTheme = document.body.classList.contains(options.darkClass) ? 'light' : 'dark';
+        const nextIsDark = nextTheme === 'dark';
+        applyThemeState(nextTheme, options);
+        try { localStorage.setItem(options.themeKey, nextTheme); } catch (_) { /* storage unavailable */ }
         if (autoThemeTimer) {
           window.clearInterval(autoThemeTimer);
           autoThemeTimer = null;

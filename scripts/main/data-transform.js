@@ -31,6 +31,25 @@
       return [];
     };
 
+  function isAbsoluteAssetPath(value) {
+    return /^(?:[a-z]+:|\/)/i.test(value);
+  }
+
+  function needsParentAssetPrefix() {
+    if (typeof window === 'undefined' || !window.location) return false;
+    return /\/pages(?:\/|$)/i.test(window.location.pathname || '');
+  }
+
+  function normalizeAssetPath(value) {
+    const s = safe(value).trim();
+    if (!s || s.startsWith('data:') || s.startsWith('./') || s.startsWith('../') || isAbsoluteAssetPath(s)) {
+      return s;
+    }
+    if (!needsParentAssetPrefix()) return s;
+    if (s.startsWith('images/')) return `../${s}`;
+    return s;
+  }
+
   function looksLikeRFamilySchema(obj) {
     return obj && (obj.Parent || obj.Grandparent);
   }
@@ -263,13 +282,17 @@
   function thumbPath(image) {
     const s = safe(image).trim();
     if (!s || s.startsWith('data:')) return '';
-    if (s.startsWith('images/thumbs/')) return s;
-    if (s.startsWith('images/')) return `images/thumbs/${s.slice('images/'.length)}`;
-    return s;
+    if (s.startsWith('images/thumbs/')) return normalizeAssetPath(s);
+    if (s.startsWith('images/')) return normalizeAssetPath(`images/thumbs/${s.slice('images/'.length)}`);
+    return normalizeAssetPath(s);
   }
 
   function attachThumbsToEntity(entity) {
     if (!entity) return;
+    entity.image = normalizeAssetPath(entity.image);
+    if (entity.spouseImage) {
+      entity.spouseImage = normalizeAssetPath(entity.spouseImage);
+    }
     entity.thumb = entity.thumb || thumbPath(entity.image);
     if (entity.spouse || entity.spouseImage) {
       entity.spouseThumb = entity.spouseThumb || thumbPath(entity.spouseImage);

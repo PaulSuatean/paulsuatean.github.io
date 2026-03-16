@@ -1,6 +1,14 @@
 (function () {
   window.AncestrioTheme?.initThemeToggle({ persistInitialTheme: true });
 
+  function debounce(fn, ms) {
+    let id;
+    return function (...args) {
+      clearTimeout(id);
+      id = setTimeout(() => fn.apply(this, args), ms);
+    };
+  }
+
   const faqItems = Array.from(document.querySelectorAll('.faq-item'));
 
   function setFaqState(item, isOpen) {
@@ -36,11 +44,11 @@
     });
   });
 
-  window.addEventListener('resize', () => {
+  window.addEventListener('resize', debounce(() => {
     faqItems.forEach((item) => {
       if (item.classList.contains('is-open')) {
         setFaqState(item, true);
       }
     });
-  });
+  }, 150));
 })();

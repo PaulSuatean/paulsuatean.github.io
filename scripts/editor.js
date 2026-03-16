@@ -73,16 +73,28 @@ let cachedThumbnailParchmentImagePromise = null;
 let cachedThumbnailHeraldicFrameDataUrlPromise = null;
 const SAVE_BUTTON_SAVING_LABEL = 'Saving...';
 const SAVE_BUTTON_SAVED_LABEL = 'Saved!';
+const editorD3ReadyPromise = (
+  window.AncestrioDeps &&
+  typeof window.AncestrioDeps.ensureD3 === 'function'
+    ? window.AncestrioDeps.ensureD3()
+    : Promise.resolve(window.d3)
+).catch((error) => {
+  console.error('Failed to load D3 for editor:', error);
+  return null;
+});
+const editorFirebaseReadyPromise = (
+  window.AncestrioDeps &&
+  typeof window.AncestrioDeps.ensureFirebaseApp === 'function'
+    ? window.AncestrioDeps.ensureFirebaseApp()
+    : Promise.resolve(typeof initializeFirebase === 'function' ? initializeFirebase() : false)
+).catch((error) => {
+  console.error('Failed to load Firebase for editor:', error);
+  return false;
+});
 
-function notifyUser(message, type = 'error', options = {}) {
-  if (window.AncestrioRuntime && typeof window.AncestrioRuntime.notify === 'function') {
-    window.AncestrioRuntime.notify(message, type, options);
-    return;
-  }
-  if (type === 'error') {
-    console.error(message);
-  } else {
-    console.warn(message);
+function notifyUser(msg, type) {
+  if (window.AncestrioRuntime && window.AncestrioRuntime.notify) {
+    window.AncestrioRuntime.notify(msg, type);
   }
 }
 
@@ -104,6 +116,51 @@ function formatBytes(bytes) {
 
 function isImageDataUrl(value) {
   return typeof value === 'string' && /^data:image\/[a-zA-Z0-9.+-]+;base64,/i.test(value);
+}
+
+function normalizeEditorAssetPath(value) {
+  const cleaned = safeText(value).trim();
+  if (!cleaned) return '';
+  if (
+    isImageDataUrl(cleaned) ||
+    /^blob:/i.test(cleaned) ||
+    /^(?:https?:)?\/\//i.test(cleaned) ||
+    cleaned.startsWith('../') ||
+    cleaned.startsWith('./') ||
+    cleaned.startsWith('/')
+  ) {
+    return cleaned;
+  }
+  if (cleaned.startsWith('images/')) {
+    return `../${cleaned}`;
+  }
+  return cleaned;
+}
+
+function deriveEditorThumbPath(value) {
+  const normalized = normalizeEditorAssetPath(value);
+  if (
+    !normalized ||
+    isImageDataUrl(normalized) ||
+    /^blob:/i.test(normalized) ||
+    /^(?:https?:)?\/\//i.test(normalized)
+  ) {
+    return normalized;
+  }
+  if (normalized.startsWith('../images/thumbs/')) return normalized;
+  if (normalized.startsWith('../images/')) {
+    return `../images/thumbs/${normalized.slice('../images/'.length)}`;
+  }
+  return normalized;
+}
+
+function resolveEditorAvatarImage(value) {
+  const full = normalizeEditorAssetPath(value);
+  const thumb = deriveEditorThumbPath(value);
+  return {
+    full,
+    preferred: thumb || full || ''
+  };
 }
 
 function readFileAsDataUrl(file) {
@@ -648,17 +705,22 @@ function initTreeSettingsControls() {
 document.addEventListener('DOMContentLoaded', async () => {
   // Theme toggle
   window.AncestrioTheme?.initThemeToggle();
+  const d3Ready = await editorD3ReadyPromise;
+  if (!d3Ready) {
+    notifyUser('Visual editor assets failed to load. JSON editing is still available.', 'warning');
+  }
   
   const urlParams = new URLSearchParams(window.location.search);
-  isLocalGuestMode = localStorage.getItem('guestMode') === 'true' || urlParams.get('guest') === '1';
+  try { isLocalGuestMode = localStorage.getItem('guestMode') === 'true' || urlParams.get('guest') === '1'; } catch (_) { isLocalGuestMode = urlParams.get('guest') === '1'; }
 
   if (isLocalGuestMode) {
-    localStorage.setItem('guestMode', 'true');
+    try { localStorage.setItem('guestMode', 'true'); } catch (_) { /* storage unavailable */ }
     configureGuestModeUI();
     loadGuestTree();
   } else {
-    localStorage.removeItem('guestMode');
-    if (!initializeFirebase()) {
+    try { localStorage.removeItem('guestMode'); } catch (_) { /* storage unavailable */ }
+    const firebaseReady = await editorFirebaseReadyPromise;
+    if (!firebaseReady) {
       window.location.href = 'auth.html';
       return;
     }
@@ -672,10 +734,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
+    let authInitialized = false;
     auth.onAuthStateChanged(async (user) => {
       if (user) {
         currentUser = user;
-        await loadTree();
+        if (!authInitialized) {
+          authInitialized = true;
+          await loadTree();
+        }
       } else {
         window.location.href = 'auth.html';
       }
@@ -683,8 +749,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Event listeners
-  document.getElementById('saveBtn').addEventListener('click', saveTree);
-  document.getElementById('viewTreeBtn').addEventListener('click', openPreview);
+  document.getElementById('saveBtn')?.addEventListener('click', saveTree);
+  document.getElementById('viewTreeBtn')?.addEventListener('click', openPreview);
   
   // Sidebar actions
   document.getElementById('addPersonBtn')?.addEventListener('click', addFamilyMember);
@@ -699,52 +765,52 @@ document.addEventListener('DOMContentLoaded', async () => {
   setActiveEditorTabState(document.querySelector('.editor-tab.active')?.dataset.tab || 'visual');
   
   // JSON toolbar
-  document.getElementById('formatJsonBtn').addEventListener('click', formatJson);
-  document.getElementById('validateJsonBtn').addEventListener('click', validateJson);
-  document.getElementById('copyJsonBtn').addEventListener('click', copyJsonText);
+  document.getElementById('formatJsonBtn')?.addEventListener('click', formatJson);
+  document.getElementById('validateJsonBtn')?.addEventListener('click', validateJson);
+  document.getElementById('copyJsonBtn')?.addEventListener('click', copyJsonText);
   
   // JSON editor - track changes
   const jsonEditor = document.getElementById('jsonEditor');
-  jsonEditor.addEventListener('input', () => {
+  jsonEditor?.addEventListener('input', () => {
     scheduleVisualRender(false);
   });
   
   // Tree settings - track changes
   initTreeSettingsControls();
-  document.getElementById('editTreeName').addEventListener('input', (event) => {
+  document.getElementById('editTreeName')?.addEventListener('input', (event) => {
     setInvalidField(event.target, false);
     markAsChanged();
   });
-  document.getElementById('editTreeDescription').addEventListener('input', markAsChanged);
-  document.getElementById('editTreePrivacy').addEventListener('change', () => {
+  document.getElementById('editTreeDescription')?.addEventListener('input', markAsChanged);
+  document.getElementById('editTreePrivacy')?.addEventListener('change', () => {
     syncShareLinkUI();
     markAsChanged();
   });
   document.getElementById('copyShareLinkBtn')?.addEventListener('click', copyEditorShareLink);
   document.getElementById('makePublicShareBtn')?.addEventListener('click', handleMakePublicShare);
-  document.getElementById('editCalendarDates').addEventListener('change', () => {
+  document.getElementById('editCalendarDates')?.addEventListener('change', () => {
     syncMemberBirthdayFieldVisibility();
     markAsChanged();
   });
-  document.getElementById('editGlobeCountries').addEventListener('change', () => {
+  document.getElementById('editGlobeCountries')?.addEventListener('change', () => {
     syncMemberCountriesSectionVisibility();
     renderVisitedCountryRows();
     markAsChanged();
   });
   
   // Import modal
-  document.getElementById('closeImportModal').addEventListener('click', hideImportModal);
-  document.getElementById('cancelImportBtn').addEventListener('click', hideImportModal);
-  document.getElementById('confirmImportBtn').addEventListener('click', importJson);
-  document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+  document.getElementById('closeImportModal')?.addEventListener('click', hideImportModal);
+  document.getElementById('cancelImportBtn')?.addEventListener('click', hideImportModal);
+  document.getElementById('confirmImportBtn')?.addEventListener('click', importJson);
+  document.getElementById('fileInput')?.addEventListener('change', handleFileSelect);
 
   // Delete confirmation modal
-  document.getElementById('closeDeleteModal').addEventListener('click', hideDeleteConfirmModal);
-  document.getElementById('cancelDeleteBtn').addEventListener('click', hideDeleteConfirmModal);
-  document.getElementById('confirmDeleteBtn').addEventListener('click', performDelete);
-  
+  document.getElementById('closeDeleteModal')?.addEventListener('click', hideDeleteConfirmModal);
+  document.getElementById('cancelDeleteBtn')?.addEventListener('click', hideDeleteConfirmModal);
+  document.getElementById('confirmDeleteBtn')?.addEventListener('click', performDelete);
+
   // Close delete modal on backdrop click
-  document.getElementById('deleteConfirmModal').addEventListener('click', (e) => {
+  document.getElementById('deleteConfirmModal')?.addEventListener('click', (e) => {
     if (e.target.id === 'deleteConfirmModal') {
       hideDeleteConfirmModal();
     }
@@ -946,7 +1012,7 @@ function persistGuestTree() {
     const privacy = settings.privacy;
     const viewStyle = resolveTreeViewStyle(currentTree);
 
-    localStorage.setItem(LOCAL_GUEST_TREE_KEY, JSON.stringify({
+    try { localStorage.setItem(LOCAL_GUEST_TREE_KEY, JSON.stringify({
       name,
       description,
       privacy,
@@ -957,7 +1023,7 @@ function persistGuestTree() {
       viewBubble: viewStyle.bubble,
       data: treeData,
       updatedAt: Date.now()
-    }));
+    })); } catch (_) { /* storage unavailable */ }
 
     currentTree = {
       ...(currentTree || {}),
@@ -1885,40 +1951,48 @@ function buildLocalPreviewDraft() {
 }
 
 function storeLocalPreviewDraft(draft) {
-  cleanupLocalPreviewDrafts();
-  const idPart = treeId || 'tree';
-  const nonce = Math.random().toString(36).slice(2, 10);
-  const key = `${LOCAL_PREVIEW_PREFIX}${idPart}:${Date.now()}:${nonce}`;
-  localStorage.setItem(key, JSON.stringify(draft));
-  return key;
+  try {
+    cleanupLocalPreviewDrafts();
+    const idPart = treeId || 'tree';
+    const nonce = Math.random().toString(36).slice(2, 10);
+    const key = `${LOCAL_PREVIEW_PREFIX}${idPart}:${Date.now()}:${nonce}`;
+    localStorage.setItem(key, JSON.stringify(draft));
+    return key;
+  } catch (_) {
+    return null;
+  }
 }
 
 function cleanupLocalPreviewDrafts() {
-  const now = Date.now();
-  const keysToDelete = [];
+  try {
+    const now = Date.now();
+    const keysToDelete = [];
 
-  for (let i = 0; i < localStorage.length; i += 1) {
-    const key = localStorage.key(i);
-    if (!key || !key.startsWith(LOCAL_PREVIEW_PREFIX)) continue;
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith(LOCAL_PREVIEW_PREFIX)) continue;
 
-    const raw = localStorage.getItem(key);
-    if (!raw) {
-      keysToDelete.push(key);
-      continue;
-    }
+      const raw = localStorage.getItem(key);
+      if (!raw) {
+        keysToDelete.push(key);
+        continue;
+      }
 
-    try {
-      const payload = JSON.parse(raw);
-      const createdAt = Number(payload && payload.createdAt);
-      if (!Number.isFinite(createdAt) || now - createdAt > LOCAL_PREVIEW_MAX_AGE_MS) {
+      try {
+        const payload = JSON.parse(raw);
+        const createdAt = Number(payload && payload.createdAt);
+        if (!Number.isFinite(createdAt) || now - createdAt > LOCAL_PREVIEW_MAX_AGE_MS) {
+          keysToDelete.push(key);
+        }
+      } catch (_) {
         keysToDelete.push(key);
       }
-    } catch (_) {
-      keysToDelete.push(key);
     }
-  }
 
-  keysToDelete.forEach((key) => localStorage.removeItem(key));
+    keysToDelete.forEach((key) => localStorage.removeItem(key));
+  } catch (_) {
+    /* storage unavailable */
+  }
 }
 function handleEditorTabKeydown(event) {
   const tabs = Array.from(document.querySelectorAll('.editor-tab'));
@@ -2150,6 +2224,7 @@ function initVisualEditor() {
   const svgEl = document.getElementById('visualTree');
   if (!svgEl || typeof d3 === 'undefined') return;
   visualState.svg = d3.select(svgEl);
+  visualState.svg.classed('tree-loading', true);
   visualState.g = visualState.svg.append('g').attr('class', 'visual-tree-layer');
   visualState.zoom = d3.zoom()
     .scaleExtent([0.2, 2.5])
@@ -3232,9 +3307,20 @@ function renderVisualEditor(resetTransform) {
   const placeholderUrl = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><rect fill="#e2e8f0" width="72" height="72"/><circle cx="36" cy="28" r="12" fill="#94a3b8"/><ellipse cx="36" cy="58" rx="20" ry="14" fill="#94a3b8"/></svg>');
   
   mergedNodes.select('.avatar-group image')
-    .attr('href', (d) => d.data.image || placeholderUrl)
+    .attr('href', (d) => resolveEditorAvatarImage(d.data.image).preferred || placeholderUrl)
+    .attr('xlink:href', (d) => resolveEditorAvatarImage(d.data.image).preferred || placeholderUrl)
     .on('error', function() {
-      d3.select(this).attr('href', placeholderUrl);
+      const datum = this.__data__ && this.__data__.data ? this.__data__.data : {};
+      const full = resolveEditorAvatarImage(datum.image).full;
+      if (full && this.getAttribute('href') !== full) {
+        d3.select(this)
+          .attr('href', full)
+          .attr('xlink:href', full);
+        return;
+      }
+      d3.select(this)
+        .attr('href', placeholderUrl)
+        .attr('xlink:href', placeholderUrl);
     });
 
   // Update name text
@@ -3281,8 +3367,17 @@ function centerVisualTree(nodes, nodeSize) {
   const shouldAnimateFit = !visualState.hasAnimatedInitialFit;
   visualState.isProgrammaticTransform = true;
   if (shouldAnimateFit) {
+    // Start zoomed-in at center, then animate outward to the correct fit
+    var startScale = scale * 1.18;
+    var startTx = width / 2 - ((minX + maxX) / 2) * startScale;
+    var startTy = height / 2 - ((minY + maxY) / 2) * startScale;
+    var startT = d3.zoomIdentity.translate(startTx, startTy).scale(startScale);
+    visualState.svg.call(visualState.zoom.transform, startT);
+    visualState.svg.classed('tree-loading', false);
+    visualState.svg.classed('tree-ready', true);
     visualState.svg.transition()
-      .duration(450)
+      .duration(500)
+      .ease(d3.easeCubicOut)
       .call(visualState.zoom.transform, transform)
       .on('end interrupt', () => {
         visualState.isProgrammaticTransform = false;
@@ -4324,7 +4419,11 @@ function showAddMemberModal(relation) {
     confirmBtn.textContent = 'Add Member';
   }
   if (titleIcon) {
-    titleIcon.textContent = 'person_add';
+    if (window.AncestrioIcons && typeof window.AncestrioIcons.setIcon === 'function') {
+      window.AncestrioIcons.setIcon(titleIcon, 'person_add');
+    } else {
+      titleIcon.textContent = 'person_add';
+    }
   }
 
   resetAddMemberForm();
@@ -4370,7 +4469,11 @@ function showEditMemberModal(meta) {
     confirmBtn.textContent = 'Save';
   }
   if (titleIcon) {
-    titleIcon.textContent = 'edit';
+    if (window.AncestrioIcons && typeof window.AncestrioIcons.setIcon === 'function') {
+      window.AncestrioIcons.setIcon(titleIcon, 'edit');
+    } else {
+      titleIcon.textContent = 'edit';
+    }
   }
 
   resetAddMemberForm();

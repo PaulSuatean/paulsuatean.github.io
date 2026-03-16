@@ -167,16 +167,16 @@
     }
   }
 
-  function debug() {
-    if (debugEnabled) originalConsole.debug.apply(console, arguments);
+  function debug(...args) {
+    if (debugEnabled) originalConsole.debug.apply(console, args);
   }
 
-  function info() {
-    if (debugEnabled) originalConsole.info.apply(console, arguments);
+  function info(...args) {
+    if (debugEnabled) originalConsole.info.apply(console, args);
   }
 
-  function log() {
-    if (debugEnabled) originalConsole.log.apply(console, arguments);
+  function log(...args) {
+    if (debugEnabled) originalConsole.log.apply(console, args);
   }
 
   window.AncestrioRuntime = {
@@ -187,14 +187,28 @@
       debug,
       info,
       log,
-      warn: function () { originalConsole.warn.apply(console, arguments); },
-      error: function () { originalConsole.error.apply(console, arguments); }
+      warn: function (...args) { originalConsole.warn.apply(console, args); },
+      error: function (...args) { originalConsole.error.apply(console, args); }
     }
   };
 
+  // Activate deferred font stylesheets.
+  // The media="print" onload="this.media='all'" pattern is blocked by CSP
+  // (no 'unsafe-inline' in script-src), so we switch them here instead.
+  function activateDeferredFonts() {
+    var links = document.querySelectorAll('link[data-font-opt][media="print"]');
+    for (var i = 0; i < links.length; i++) {
+      links[i].media = 'all';
+    }
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', flushPendingToasts, { once: true });
+    document.addEventListener('DOMContentLoaded', function () {
+      flushPendingToasts();
+      activateDeferredFonts();
+    }, { once: true });
   } else {
     flushPendingToasts();
+    activateDeferredFonts();
   }
 })();

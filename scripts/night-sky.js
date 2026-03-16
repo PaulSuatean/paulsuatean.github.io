@@ -1,23 +1,16 @@
 (function () {
   if (!document.body) return;
-
-  const themeKey = 'tree-theme';
-  const savedTheme = localStorage.getItem(themeKey);
-  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const shouldUseDark = savedTheme ? savedTheme === 'dark' : prefersDark;
-  if (shouldUseDark && !document.body.classList.contains('theme-dark')) {
-    document.body.classList.add('theme-dark');
-  }
+  if (!document.body.hasAttribute('data-ambient-enabled')) return;
 
   const layers = [
     {
       className: 'night-sky__layer layer-1',
       depth: 0.08,
-      density: 0.00018,
-      size: [0.7, 1.8],
+      density: 0.00011,
+      size: [0.65, 1.7],
       alpha: [0.55, 0.92],
-      glowChance: 0.12,
-      sparkleChance: 0.07,
+      glowChance: 0.09,
+      sparkleChance: 0.05,
       colors: [
         [255, 255, 255],
         [189, 220, 255],
@@ -28,11 +21,11 @@
     {
       className: 'night-sky__layer layer-2',
       depth: 0.2,
-      density: 0.00011,
-      size: [0.85, 1.95],
+      density: 0.00007,
+      size: [0.8, 1.85],
       alpha: [0.34, 0.72],
-      glowChance: 0.08,
-      sparkleChance: 0.04,
+      glowChance: 0.06,
+      sparkleChance: 0.03,
       colors: [
         [245, 248, 255],
         [160, 205, 255],
@@ -42,10 +35,10 @@
     {
       className: 'night-sky__layer layer-3',
       depth: 0.34,
-      density: 0.00008,
-      size: [1.0, 2.4],
+      density: 0.00005,
+      size: [0.95, 2.1],
       alpha: [0.24, 0.58],
-      glowChance: 0.05,
+      glowChance: 0.03,
       sparkleChance: 0.02,
       colors: [
         [255, 255, 255],
@@ -61,6 +54,14 @@
 
   function colorWithAlpha(rgb, alpha) {
     return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha.toFixed(3)})`;
+  }
+
+  function isDarkTheme() {
+    return document.body.classList.contains('theme-dark');
+  }
+
+  function shouldDrawGalaxy(width, height) {
+    return width >= 960 && height >= 640;
   }
 
   function drawNebulaGlow(ctx, width, height, options) {
@@ -132,12 +133,12 @@
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.clearRect(0, 0, width, height);
-    if (config.drawGalaxy) {
+    if (config.drawGalaxy && shouldDrawGalaxy(width, height)) {
       drawGalaxyBackdrop(ctx, width, height);
     }
 
     const area = width * height;
-    const count = Math.max(80, Math.round(area * config.density));
+    const count = Math.max(56, Math.round(area * config.density));
     for (let i = 0; i < count; i += 1) {
       const x = randomBetween(random, 0, width);
       const y = randomBetween(random, 0, height);
@@ -172,14 +173,69 @@
     }
   }
 
-  function initSky() {
-    if (document.body.querySelector('.night-sky')) return;
+  function debounce(fn, ms) {
+    let id;
+    return function (...args) {
+      clearTimeout(id);
+      id = setTimeout(() => fn.apply(this, args), ms);
+    };
+  }
 
-    const skyEl = document.createElement('div');
+  let skyEl = null;
+  let layerEls = [];
+
+  function getCanvasSize() {
+    var width = window.innerWidth || document.documentElement.clientWidth || 1;
+    var height = window.innerHeight || document.documentElement.clientHeight || 1;
+    return { width: width, height: height };
+  }
+
+  function resizeCanvases(forceDraw) {
+    if (!skyEl || !layerEls.length) return;
+
+    var shouldDraw = Boolean(forceDraw) || isDarkTheme();
+    var ratio = 1;
+    var { width, height } = getCanvasSize();
+    layerEls.forEach(function (canvas, index) {
+      canvas.width = Math.round(width * ratio);
+      canvas.height = Math.round(height * ratio);
+      canvas.style.width = width + 'px';
+      canvas.style.height = height + 'px';
+      var ctx = canvas.getContext('2d');
+      if (ctx) ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      if (shouldDraw) {
+        drawStars(canvas, layers[index], width, height, Math.random);
+      }
+    });
+  }
+
+  function applySkyVisibility() {
+    if (!skyEl) return;
+
+    const darkThemeActive = isDarkTheme();
+    skyEl.style.opacity = darkThemeActive ? '1' : '0';
+    if (!darkThemeActive) {
+      layerEls.forEach((canvas) => {
+        canvas.style.transform = 'translate3d(0, 0, 0)';
+      });
+      return;
+    }
+
+    resizeCanvases(true);
+  }
+
+  const handleResize = debounce(function () {
+    resizeCanvases(false);
+  }, 200);
+
+  function initSky() {
+    if (skyEl || !isDarkTheme()) return;
+
+    skyEl = document.createElement('div');
     skyEl.className = 'night-sky';
     skyEl.setAttribute('aria-hidden', 'true');
 
-    const layerEls = layers.map((layer) => {
+    layerEls = layers.map((layer) => {
       const canvas = document.createElement('canvas');
       canvas.className = layer.className;
       canvas.dataset.depth = String(layer.depth);
@@ -188,98 +244,29 @@
     });
 
     document.body.prepend(skyEl);
-
-    function applySkyVisibility() {
-      const isDark = document.body.classList.contains('theme-dark');
-      skyEl.style.opacity = isDark ? '1' : '0';
-    }
-
+    resizeCanvases(true);
     applySkyVisibility();
-
-    if (window.MutationObserver) {
-      const observer = new MutationObserver((entries) => {
-        for (const entry of entries) {
-          if (entry.attributeName === 'class') {
-            applySkyVisibility();
-            break;
-          }
-        }
-      });
-      observer.observe(document.body, { attributes: true });
-    }
-
-    function getCanvasSize() {
-      const doc = document.documentElement;
-      const width = Math.max(doc.scrollWidth, doc.clientWidth, window.innerWidth || 0, document.body.scrollWidth || 0);
-      const height = Math.max(doc.scrollHeight, doc.clientHeight, window.innerHeight || 0, document.body.scrollHeight || 0);
-      return { width: Math.max(1, width), height: Math.max(1, height) };
-    }
-
-    function resizeCanvases() {
-      const ratio = window.devicePixelRatio || 1;
-      const { width, height } = getCanvasSize();
-      layerEls.forEach((canvas, index) => {
-        canvas.width = Math.round(width * ratio);
-        canvas.height = Math.round(height * ratio);
-        canvas.style.width = `${width}px`;
-        canvas.style.height = `${height}px`;
-        const ctx = canvas.getContext('2d');
-        if (ctx) ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-        const layerRandom = Math.random;
-        drawStars(canvas, layers[index], width, height, layerRandom);
-      });
-    }
-
-    resizeCanvases();
-
-    let targetX = 0;
-    let targetY = 0;
-    let currentX = 0;
-    let currentY = 0;
-
-    function onMouseMove(e) {
-      const rect = { width: window.innerWidth, height: window.innerHeight, left: 0, top: 0 };
-      
-      const centerX = rect.width / 2;
-      const centerY = rect.height / 2;
-      
-      // Normalize to -1 to 1 range
-      targetX = (e.clientX - rect.left - centerX) / centerX;
-      targetY = (e.clientY - rect.top - centerY) / centerY;
-      
-      // Clamp values
-      targetX = Math.max(-1, Math.min(1, targetX));
-      targetY = Math.max(-1, Math.min(1, targetY));
-    }
-
-    function animate() {
-      // Smooth easing (lerp with factor 0.08 for smooth movement)
-      const ease = 0.08;
-      currentX += (targetX - currentX) * ease;
-      currentY += (targetY - currentY) * ease;
-
-      layerEls.forEach((canvas, index) => {
-        const depth = layers[index].depth;
-        // Subtle movement - max 20 pixels
-        const maxMove = 20;
-        const moveX = currentX * depth * maxMove;
-        const moveY = currentY * depth * maxMove;
-        canvas.style.transform = `translate3d(${moveX}px, ${moveY}px, 0)`;
-      });
-
-      requestAnimationFrame(animate);
-    }
-
-    animate();
-
-    window.addEventListener('mousemove', onMouseMove);
-
-    window.addEventListener('resize', resizeCanvases);
-    if (window.ResizeObserver) {
-      const resizeObserver = new ResizeObserver(() => resizeCanvases());
-      resizeObserver.observe(document.documentElement);
-    }
+    window.addEventListener('resize', handleResize);
   }
 
-  initSky();
+  function syncSkyWithTheme() {
+    if (isDarkTheme()) {
+      initSky();
+    }
+    applySkyVisibility();
+  }
+
+  if (window.MutationObserver) {
+    const observer = new MutationObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.attributeName === 'class') {
+          syncSkyWithTheme();
+          break;
+        }
+      }
+    });
+    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  }
+
+  syncSkyWithTheme();
 })();
